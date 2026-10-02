@@ -1,0 +1,27 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+title: "CMOS Op-Amp Topology Exploration v6 (Physics-Aware)"
+problem_description: "Evolve a CMOS Op-Amp topology in SPICE to maximize Gain while maintaining physical feasibility. CONSTRAINTS: 1. Maintain nodes 'OUT1' and 'OUT2' as the differential outputs. 2. Avoid 'Clipping': The output signal should not hit the 0V or 5V rails (keep it between 0.5V and 4.5V). 3. Power Efficiency: Minimize current draw from VDD. 4. Topologies: You are encouraged to use Active Loads (PMOS), Current Mirrors, and multi-stage designs."
+program_language: "spice"
+primary_metric: "voltage_gain"
+initial_score: 0.0
+
+seed_files:
+  - "main.cir"
+  - "CMOS.lib"
+
+evaluator:
+  script: "evaluator.py"
+  method: "evaluate"

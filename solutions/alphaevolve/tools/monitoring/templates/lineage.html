@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AlphaEvolve Evolutionary Lineage Forest</title>
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #f8f9fa; color: #212529; }
+    .container { max-width: 1350px; margin: 0 auto; background: white; padding: 28px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    h1 { color: #188038; margin-top: 0; font-size: 1.8em; }
+    .stats-row { display: flex; gap: 16px; margin: 16px 0; }
+    .stat-card { flex: 1; background: #f1f3f4; padding: 14px; border-radius: 8px; text-align: center; }
+    .stat-card h2 { margin: 0; font-size: 1.8em; color: #188038; }
+    .stat-card p { margin: 4px 0 0; color: #5f6368; font-weight: 500; font-size: 0.9em; }
+    
+    .exp-switcher { background: #e8f0fe; padding: 14px 18px; border-radius: 8px; border: 1px solid #d2e3fc; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    
+    .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #fafafa; padding: 12px 16px; border: 1px solid #e0e0e0; border-radius: 8px 8px 0 0; border-bottom: none; }
+    .toolbar input, .toolbar select { padding: 7px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9em; }
+    .toolbar button { padding: 7px 14px; border-radius: 6px; border: 1px solid #1a73e8; background: #1a73e8; color: white; cursor: pointer; font-weight: 500; font-size: 0.9em; }
+    .toolbar button:hover { background: #1557b0; }
+    .toolbar button.secondary { background: white; color: #1a73e8; }
+    .toolbar button.secondary:hover { background: #e8f0fe; }
+
+    #vis-container { height: 560px; border: 1px solid #e0e0e0; border-radius: 0 0 8px 8px; background: #ffffff; position: relative; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e0e0e0; text-align: left; font-size: 0.92em; }
+    th { background: #f1f3f4; }
+    
+    .tag { background: #e6f4ea; color: #137333; padding: 3px 8px; border-radius: 12px; font-size: 0.85em; display: inline-block; margin: 2px; font-weight: 500; cursor: pointer; text-decoration: none; }
+    .tag:hover { opacity: 0.8; }
+    .tag-parent { background: #e8f0fe; color: #1a73e8; }
+    .tag-score { background: #fef7e0; color: #b06000; font-weight: 600; }
+    .tag-failed { background: #fce8e6; color: #c5221f; }
+
+    /* Inspection Modal / Drawer */
+    #drawer-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 1000; }
+    #drawer { position: fixed; top: 0; right: -720px; width: 680px; height: 100%; background: white; z-index: 1001; box-shadow: -4px 0 20px rgba(0,0,0,0.2); transition: right 0.3s ease; display: flex; flex-direction: column; }
+    #drawer.open { right: 0; }
+    .drawer-header { padding: 20px 24px; border-bottom: 1px solid #e0e0e0; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; }
+    .drawer-header h2 { margin: 0; font-size: 1.3em; color: #1a73e8; }
+    .drawer-close { font-size: 1.5em; cursor: pointer; color: #5f6368; border: none; background: none; }
+    .drawer-body { padding: 24px; overflow-y: auto; flex: 1; }
+    .drawer-section { margin-bottom: 22px; }
+    .drawer-section h4 { margin: 0 0 8px 0; color: #3c4043; font-size: 1em; border-bottom: 2px solid #e8f0fe; padding-bottom: 4px; }
+    .file-tabs { display: flex; gap: 4px; border-bottom: 1px solid #ccc; margin-bottom: 12px; }
+    .tab-btn { padding: 6px 14px; border: 1px solid #ccc; border-bottom: none; border-radius: 6px 6px 0 0; background: #f1f3f4; cursor: pointer; font-size: 0.88em; }
+    .tab-btn.active { background: #2d2d2d; color: white; border-color: #2d2d2d; }
+    .code-container { position: relative; }
+    .copy-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; cursor: pointer; font-size: 0.8em; }
+    .copy-btn:hover { background: rgba(255,255,255,0.4); }
+    pre[class*="language-"] { margin: 0; border-radius: 6px; max-height: 380px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" style="color: #1a73e8; text-decoration: none; font-weight: 600;">&larr; Back to Dashboard Home</a>
+    <h1>🌳 AlphaEvolve Evolutionary Lineage Forest<br><span id="page-exp-title" style="color: #1a73e8; font-size: 0.8em; font-weight: 500;">Discovering experiment...</span></h1>
+    <p>Interactive graph and directory showing parent-child-sibling evolutionary relationships across all generated candidate programs. <strong>Click any program node or tag to inspect details &amp; source code.</strong></p>
+    
+    <div class="exp-switcher">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <label for="exp-selector" style="font-weight: 600; color: #1a73e8;">Switch Active Experiment:</label>
+        <select id="exp-selector" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #1a73e8; font-size: 0.95rem; min-width: 360px; background: white;"></select>
+      </div>
+      <div id="exp-meta" style="color: #5f6368; font-size: 0.88em; font-weight: 500;"></div>
+    </div>
+
+    <div id="loading"><strong>🔍 Building interactive evolutionary forest graph...</strong></div>
+    <div id="content" style="display: none;">
+      <div class="stats-row">
+        <div class="stat-card"><h2 id="stat-nodes">0</h2><p>Total Candidate Programs</p></div>
+        <div class="stat-card"><h2 id="stat-seeds">0</h2><p>Seed / Initial Programs</p></div>
+        <div class="stat-card"><h2 id="stat-depth">0</h2><p>Max Evolutionary Depth (Generations)</p></div>
+        <div class="stat-card" style="border: 2px solid #f9ab00; background: #fffcf0; cursor: pointer;" id="stat-best-card" onclick="highlightBestProgram()" title="Click to view winning candidate in lineage forest"><h2 id="stat-best" style="color: #e37400;">-</h2><p style="font-weight: 600; color: #b06000;">🏆 Best Candidate Score</p></div>
+      </div>
+
+      <h3>Interactive Ancestry Network Graph</h3>
+      <div class="toolbar">
+        <input type="text" id="search-input" placeholder="🔍 Search Program ID..." oninput="filterGraph()">
+        <select id="gen-filter" onchange="filterGraph()">
+          <option value="all">All Generation Levels</option>
+        </select>
+        <select id="state-filter" onchange="filterGraph()">
+          <option value="all">All States (Completed, Evaluating &amp; Failed)</option>
+          <option value="COMPLETED">Completed Only</option>
+          <option value="EVALUATING">⏳ Evaluating / In Progress Only</option>
+          <option value="EVALUATION_FAILED">Failed Only</option>
+        </select>
+        <button class="secondary" onclick="fitGraph()">🎯 Fit View</button>
+        <button class="secondary" onclick="resetGraphFilters()">🔄 Reset Filters</button>
+      </div>
+      <div id="vis-container"></div>
+
+      <h3>Evolutionary Forest Directory</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Program ID</th>
+            <th>Generation</th>
+            <th>State</th>
+            <th>Primary Score</th>
+            <th>Parent Programs</th>
+            <th>Offspring / Children</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Slide-over Program Detail Drawer -->
+  <div id="drawer-overlay" onclick="closeDrawer()"></div>
+  <div id="drawer">
+    <div class="drawer-header">
+      <div>
+        <h2 id="drawer-title">Program Details</h2>
+        <div id="drawer-subtitle" style="margin-top:4px; font-size:0.85em; color:#5f6368;"></div>
+      </div>
+      <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <h4>📊 Performance Scores &amp; Evaluation Metrics</h4>
+        <div id="drawer-scores"></div>
+      </div>
+
+      <div class="drawer-section">
+        <h4>🌿 Evolutionary Lineage Relationships</h4>
+        <div id="drawer-lineage-links"></div>
+      </div>
+
+      <div class="drawer-section" id="drawer-insights-section" style="display:none;">
+        <h4>⚠️ Evaluation Log &amp; Insights</h4>
+        <div id="drawer-insights" style="background:#fce8e6; padding:12px; border-radius:6px; font-size:0.88em; color:#c5221f;"></div>
+      </div>
+
+      <div class="drawer-section">
+        <h4>💻 Source Code Files</h4>
+        <div id="drawer-code-loading"><em>Loading unflattened source code files...</em></div>
+        <div id="drawer-code-container" style="display:none;">
+          <div class="file-tabs" id="file-tabs"></div>
+          <div class="code-container">
+            <button class="copy-btn" onclick="copyActiveCode()">📋 Copy Code</button>
+            <pre><code id="code-viewer" class="language-python"></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let network = null;
+    let nodesDataSet = null;
+    let edgesDataSet = null;
+    let rawLineageData = null;
+    let currentExp = null;
+    let activeFiles = [];
+    let activeFileIndex = 0;
+
+    async function loadLineage() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentExp = urlParams.get('exp');
+
+        const expsRes = await fetch('/api/experiments');
+        const expsData = await expsRes.json();
+        const exps = expsData.experiments || [];
+        const selector = document.getElementById('exp-selector');
+        selector.innerHTML = '';
+
+        if (exps.length === 0 && !currentExp) {
+          document.getElementById('loading').innerHTML = '<span style="color: red;">No experiments discovered in this project.</span>';
+          return;
+        }
+
+        exps.forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.name;
+          const t = (e.config && e.config.title) ? e.config.title : e.name.split('/').pop();
+          opt.textContent = `${t} (${e.state || 'UNSPECIFIED'}) - ${e.name.split('/').pop()}`;
+          selector.appendChild(opt);
+        });
+
+        if (!currentExp && exps.length > 0) {
+          currentExp = exps[0].name;
+        }
+        if (currentExp) {
+          selector.value = currentExp;
+        }
+
+        const selectedExpObj = exps.find(e => e.name === currentExp);
+        const titleText = selectedExpObj && selectedExpObj.config && selectedExpObj.config.title
+          ? selectedExpObj.config.title
+          : (currentExp ? currentExp.split('/').pop() : 'Unknown Experiment');
+        const shortId = currentExp ? currentExp.split('/').pop() : '';
+        document.getElementById('page-exp-title').innerText = `${titleText} [ID: ${shortId}]`;
+        document.getElementById('exp-meta').innerText = selectedExpObj ? `Language: ${selectedExpObj.config?.programLanguage || 'unknown'} | Status: ${selectedExpObj.state}` : '';
+
+        selector.onchange = function() {
+          window.location.search = '?exp=' + encodeURIComponent(this.value);
+        };
+
+        const res = await fetch('/api/lineage?exp=' + encodeURIComponent(currentExp));
+        rawLineageData = await res.json();
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+        document.getElementById('stat-nodes').innerText = rawLineageData.total_nodes || 0;
+        document.getElementById('stat-seeds').innerText = (rawLineageData.seed_programs || []).length;
+        document.getElementById('stat-depth').innerText = rawLineageData.max_evolution_depth || 0;
+
+        let bestProgId = rawLineageData.best_program_id;
+        if (!bestProgId) {
+          let maxSc = -Infinity;
+          for (const [pid, details] of Object.entries(rawLineageData.node_details || {})) {
+            if (details.target_score !== undefined && details.target_score !== null && typeof details.target_score === 'number') {
+              if (details.target_score > maxSc) {
+                maxSc = details.target_score;
+                bestProgId = pid;
+              }
+            }
+          }
+        }
+        currentBestProgId = bestProgId;
+        const bestDetails = (rawLineageData.node_details || {})[bestProgId] || {};
+        const bestSc = bestDetails.target_score;
+        document.getElementById('stat-best').innerText = (bestSc !== undefined && bestSc !== null)
+          ? (typeof bestSc === 'number' ? bestSc.toFixed(4) : bestSc)
+          : 'N/A';
+
+        // Populate Generation Filter dropdown
+        const genSelect = document.getElementById('gen-filter');
+        genSelect.innerHTML = '<option value="all">All Generation Levels</option>';
+        const maxDepth = rawLineageData.max_evolution_depth || 0;
+        for (let d = 0; d <= maxDepth; d++) {
+          const opt = document.createElement('option');
+          opt.value = d;
+          opt.textContent = `Gen ${d}`;
+          genSelect.appendChild(opt);
+        }
+
+        buildDirectoryTable(rawLineageData);
+        buildVisNetwork(rawLineageData);
+
+      } catch (err) {
+        document.getElementById('loading').innerHTML = '<span style="color: red;">Error loading lineage: ' + err.message + '</span>';
+      }
+    }
+
+    let currentBestProgId = null;
+
+    function highlightBestProgram() {
+      if (!currentBestProgId) return;
+      if (network) {
+        network.selectNodes([currentBestProgId]);
+        network.focus(currentBestProgId, {
+          scale: 1.2,
+          animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+        });
+      }
+      openProgramDrawer(currentBestProgId);
+    }
+
+    function isProgramFailed(details, pid, seedPrograms) {
+      const st = (details.state || '').toUpperCase();
+      if (st.includes('FAIL') || st.includes('ERROR')) return true;
+      if (st.includes('EVALUATING') || st.includes('RUNNING') || st.includes('CREATED') || st.includes('UNSPECIFIED')) return false;
+      if (details.insights && details.insights.some(i => i.toLowerCase().includes('error') || i.toLowerCase().includes('fail'))) return true;
+      const isSeed = seedPrograms && seedPrograms.includes(pid);
+      if (!isSeed && st.includes('COMPLETED') && (details.target_score === null || details.target_score === undefined)) {
+        if (!details.scores || Object.keys(details.scores).length === 0) return true;
+      }
+      return false;
+    }
+
+    function buildDirectoryTable(data) {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      const nodeDetails = data.node_details || {};
+      const depthMap = data.program_depths || {};
+      const seedPrograms = data.seed_programs || [];
+      const bestProgId = currentBestProgId;
+      const allNodes = Object.keys(data.child_to_parents || {}).sort((a,b) => (depthMap[a]||0) - (depthMap[b]||0));
+
+      allNodes.forEach(pid => {
+        const details = nodeDetails[pid] || {};
+        const depth = depthMap[pid] !== undefined ? `Gen ${depthMap[pid]}` : 'Gen 0';
+        const failed = isProgramFailed(details, pid, seedPrograms);
+        const stStr = (details.state || '').toUpperCase();
+        const isEval = stStr.includes('EVALUATING') || stStr.includes('RUNNING') || stStr.includes('CREATED');
+        const isBest = (bestProgId && pid === bestProgId);
+        const scoreVal = details.target_score !== undefined && details.target_score !== null
+          ? (typeof details.target_score === 'number' ? details.target_score.toFixed(4) : details.target_score)
+          : (isEval ? 'Evaluating...' : 'N/A');
+        
+        const parents = (details.parent_ids || []).map(p => `<span class="tag tag-parent" onclick="openProgramDrawer('${p}')">${p}</span>`).join(' ');
+        const children = (details.children_ids || []).map(c => `<span class="tag" onclick="openProgramDrawer('${c}')">${c}</span>`).join(' ');
+
+        const stateBadge = failed
+          ? '<span class="tag tag-failed">FAILED</span>'
+          : (isEval ? '<span class="tag" style="background:#fef7e0;color:#b06000;">⏳ EVALUATING</span>' : '<span class="tag" style="background:#e6f4ea;color:#137333;">COMPLETED</span>');
+
+        const scoreTag = isBest
+          ? `<span class="tag" style="background:#fff3e0;color:#b06000;font-weight:700;border:1px solid #f9ab00;">⭐ ${scoreVal}</span>`
+          : `<span class="tag tag-score">${scoreVal}</span>`;
+
+        const inspectBtn = isBest
+          ? `<button style="background:#f9ab00;color:white;border:none;padding:4px 10px;font-size:0.82em;border-radius:4px;font-weight:600;cursor:pointer;" onclick="openProgramDrawer('${pid}')">🏆 Inspect Best Code</button>`
+          : `<button class="secondary" style="padding:4px 8px;font-size:0.82em;" onclick="openProgramDrawer('${pid}')">🔍 Inspect Code</button>`;
+
+        const tr = document.createElement('tr');
+        tr.dataset.pid = pid;
+        if (isBest) {
+          tr.style.background = '#fffcf0';
+          tr.style.borderLeft = '4px solid #f9ab00';
+        }
+        tr.innerHTML = `
+          <td><strong style="color:#1a73e8;cursor:pointer;" onclick="openProgramDrawer('${pid}')">${pid}</strong>${isBest ? ' <span class="tag" style="background:#f9ab00;color:white;font-weight:700;padding:2px 8px;border-radius:12px;margin-left:6px;font-size:0.78em;">🏆 BEST</span>' : ''}</td>
+          <td><span class="tag" style="background:#f1f3f4;color:#212529;">${depth}</span></td>
+          <td>${stateBadge}</td>
+          <td>${scoreTag}</td>
+          <td>${parents || '<em>Seed</em>'}</td>
+          <td>${children || '<em>Leaf</em>'}</td>
+          <td>${inspectBtn}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function buildVisNetwork(data) {
+      const container = document.getElementById('vis-container');
+      const nodeDetails = data.node_details || {};
+      const depthMap = data.program_depths || {};
+      const parentsMap = data.parent_to_children || {};
+      const seedPrograms = data.seed_programs || [];
+      const bestProgId = currentBestProgId;
+
+      const visNodes = [];
+      const visEdges = [];
+
+      Object.keys(data.child_to_parents || {}).forEach(pid => {
+        const details = nodeDetails[pid] || {};
+        const depth = depthMap[pid] !== undefined ? depthMap[pid] : 0;
+        const isSeed = seedPrograms.includes(pid);
+        const isBest = (bestProgId && pid === bestProgId);
+        const isFailed = isProgramFailed(details, pid, seedPrograms);
+        const stStr = (details.state || '').toUpperCase();
+        const isEval = stStr.includes('EVALUATING') || stStr.includes('RUNNING') || stStr.includes('CREATED');
+        const scoreVal = details.target_score !== undefined && details.target_score !== null
+          ? (typeof details.target_score === 'number' ? details.target_score.toFixed(3) : details.target_score)
+          : null;
+
+        let bgCol = isBest ? '#fff8e1' : (isFailed ? '#fce8e6' : (scoreVal !== null ? '#e6f4ea' : (isEval ? '#fef7e0' : '#e8f0fe')));
+        let borderCol = isBest ? '#f9ab00' : (isFailed ? '#d93025' : (isSeed ? '#f9ab00' : (isEval ? '#e37400' : '#1a73e8')));
+        let textCol = isFailed ? '#c5221f' : '#212529';
+
+        let labelText = isBest ? `🏆 [G${depth}] Prog ${pid} (BEST)` : `[G${depth}] Prog ${pid}`;
+        if (scoreVal !== null) labelText += (isBest ? `\n⭐ Score: ${scoreVal}` : `\nScore: ${scoreVal}`);
+        else if (isFailed) labelText += `\n[FAILED]`;
+        else if (isEval) labelText += `\n[⏳ EVALUATING]`;
+
+        visNodes.push({
+          id: pid,
+          label: labelText,
+          level: depth,
+          shape: isSeed ? 'diamond' : 'box',
+          margin: 10,
+          color: {
+            background: bgCol,
+            border: borderCol,
+            highlight: { background: '#fff8e1', border: '#f9ab00' }
+          },
+          font: { color: textCol, face: 'Roboto, sans-serif', size: isBest ? 14 : 13, bold: isBest, multi: true },
+          borderWidth: isBest ? 4 : (isSeed ? 3 : 2),
+          shadow: true,
+          title: `${isBest ? '<strong style="color:#e37400;">🏆 TOP-RANKED CANDIDATE</strong><br>' : ''}Program ID: ${pid}<br>Gen: ${depth}<br>State: ${isFailed ? 'FAILED' : (details.state || 'N/A')}<br>Score: ${scoreVal !== null ? scoreVal : 'N/A'}`
+        });
+      });
+
+      for (const [parent, children] of Object.entries(parentsMap)) {
+        for (const child of children) {
+          visEdges.push({
+            from: parent,
+            to: child,
+            arrows: 'to',
+            color: { color: '#bdc1c6', highlight: '#1a73e8' },
+            smooth: { type: 'cubicBezier', forceDirection: 'horizontal' }
+          });
+        }
+      }
+
+      nodesDataSet = new vis.DataSet(visNodes);
+      edgesDataSet = new vis.DataSet(visEdges);
+
+      const options = {
+        layout: {
+          hierarchical: {
+            direction: 'LR',
+            sortMethod: 'directed',
+            levelSeparation: 180,
+            nodeSpacing: 90
+          }
+        },
+        physics: false,
+        interaction: { hover: true, tooltipDelay: 150 }
+      };
+
+      network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
+
+      network.on("click", function(params) {
+        if (params.nodes.length > 0) {
+          const selectedNodeId = params.nodes[0];
+          openProgramDrawer(selectedNodeId);
+        }
+      });
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const autoProg = urlParams.get('prog');
+      if (autoProg && visNodes.some(n => n.id === autoProg)) {
+        setTimeout(() => {
+          network.selectNodes([autoProg]);
+          network.focus(autoProg, { scale: 1.15, animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+          openProgramDrawer(autoProg);
+        }, 300);
+      }
+    }
+
+    function filterGraph() {
+      if (!nodesDataSet || !rawLineageData) return;
+      const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+      const genVal = document.getElementById('gen-filter').value;
+      const stateVal = document.getElementById('state-filter').value;
+      const nodeDetails = rawLineageData.node_details || {};
+      const depthMap = rawLineageData.program_depths || {};
+      const seedPrograms = rawLineageData.seed_programs || [];
+
+      const allNodes = Object.keys(rawLineageData.child_to_parents || {});
+      allNodes.forEach(pid => {
+        const details = nodeDetails[pid] || {};
+        const depth = depthMap[pid] !== undefined ? depthMap[pid] : 0;
+        const failed = isProgramFailed(details, pid, seedPrograms);
+
+        const stStr = (details.state || '').toUpperCase();
+        const isEval = stStr === 'EVALUATING' || stStr === 'RUNNING' || stStr === 'CREATED';
+
+        const matchSearch = !searchVal || pid.toLowerCase().includes(searchVal);
+        const matchGen = genVal === 'all' || depth.toString() === genVal;
+        
+        let matchState = true;
+        if (stateVal === 'COMPLETED') {
+          matchState = !failed && !isEval;
+        } else if (stateVal === 'EVALUATING') {
+          matchState = isEval;
+        } else if (stateVal === 'EVALUATION_FAILED' || stateVal === 'FAILED') {
+          matchState = failed;
+        }
+
+        if (matchSearch && matchGen && matchState) {
+          nodesDataSet.update({ id: pid, hidden: false });
+        } else {
+          nodesDataSet.update({ id: pid, hidden: true });
+        }
+      });
+
+      const trs = document.querySelectorAll('#table-body tr');
+      trs.forEach(tr => {
+        const pid = tr.dataset.pid;
+        const details = nodeDetails[pid] || {};
+        const depth = depthMap[pid] !== undefined ? depthMap[pid] : 0;
+        const failed = isProgramFailed(details, pid, seedPrograms);
+        const stStr = (details.state || '').toUpperCase();
+        const isEval = stStr === 'EVALUATING' || stStr === 'RUNNING' || stStr === 'CREATED';
+
+        const matchSearch = !searchVal || pid.toLowerCase().includes(searchVal);
+        const matchGen = genVal === 'all' || depth.toString() === genVal;
+        let matchState = true;
+        if (stateVal === 'COMPLETED') matchState = !failed && !isEval;
+        else if (stateVal === 'EVALUATING') matchState = isEval;
+        else if (stateVal === 'EVALUATION_FAILED' || stateVal === 'FAILED') matchState = failed;
+
+        tr.style.display = (matchSearch && matchGen && matchState) ? '' : 'none';
+      });
+    }
+
+    function fitGraph() {
+      if (network) network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+    }
+
+    function resetGraphFilters() {
+      document.getElementById('search-input').value = '';
+      document.getElementById('gen-filter').value = 'all';
+      document.getElementById('state-filter').value = 'all';
+      filterGraph();
+      fitGraph();
+    }
+
+    async function openProgramDrawer(progId) {
+      document.getElementById('drawer-overlay').style.display = 'block';
+      const drawer = document.getElementById('drawer');
+      drawer.classList.add('open');
+
+      document.getElementById('drawer-title').innerText = `Program ${progId}`;
+      document.getElementById('drawer-subtitle').innerText = `Experiment: ${currentExp ? currentExp.split('/').pop() : ''}`;
+
+      document.getElementById('drawer-code-loading').style.display = 'block';
+      document.getElementById('drawer-code-container').style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/program_code?exp=${encodeURIComponent(currentExp)}&prog=${encodeURIComponent(progId)}`);
+        const data = await res.json();
+
+        // Render Scores
+        const scoresContainer = document.getElementById('drawer-scores');
+        const scores = data.scores || {};
+        if (Object.keys(scores).length === 0) {
+          scoresContainer.innerHTML = '<p style="color:#5f6368;font-size:0.9em;"><em>No evaluation scores returned (Program failed or unrated).</em></p>';
+        } else {
+          let scoreHtml = '<table style="margin-top:0;"><thead><tr><th>Metric Name</th><th>Value</th></tr></thead><tbody>';
+          for (const [k, v] of Object.entries(scores)) {
+            const displayVal = typeof v === 'number' ? v.toFixed(6) : v;
+            scoreHtml += `<tr><td><strong>${k}</strong></td><td><code>${displayVal}</code></td></tr>`;
+          }
+          scoreHtml += '</tbody></table>';
+          scoresContainer.innerHTML = scoreHtml;
+        }
+
+        // Render Lineage Links
+        const lineageContainer = document.getElementById('drawer-lineage-links');
+        const parents = (data.parent_ids || []).map(p => `<span class="tag tag-parent" onclick="openProgramDrawer('${p}')">Parent ${p}</span>`).join(' ');
+        lineageContainer.innerHTML = parents ? parents : '<em>Seed Program (No Parent)</em>';
+
+        // Render Insights / Failure Log
+        const insightsSec = document.getElementById('drawer-insights-section');
+        const insightsDiv = document.getElementById('drawer-insights');
+        const insights = data.insights || [];
+        if (data.state === 'EVALUATION_FAILED' || insights.length > 0) {
+          insightsSec.style.display = 'block';
+          insightsDiv.innerHTML = insights.length > 0 ? insights.join('<br>') : `State: ${data.state}`;
+        } else {
+          insightsSec.style.display = 'none';
+        }
+
+        // Render Code Files Tabs
+        activeFiles = data.files || [];
+        activeFileIndex = 0;
+        document.getElementById('drawer-code-loading').style.display = 'none';
+        document.getElementById('drawer-code-container').style.display = 'block';
+
+        const tabsDiv = document.getElementById('file-tabs');
+        tabsDiv.innerHTML = '';
+        if (activeFiles.length === 0) {
+          tabsDiv.innerHTML = '<em>No source code files attached.</em>';
+          document.getElementById('code-viewer').textContent = '# No source code available.';
+        } else {
+          activeFiles.forEach((fileObj, idx) => {
+            const btn = document.createElement('button');
+            btn.className = `tab-btn ${idx === 0 ? 'active' : ''}`;
+            btn.innerText = fileObj.path || `file_${idx}.py`;
+            btn.onclick = () => selectCodeFile(idx);
+            tabsDiv.appendChild(btn);
+          });
+          selectCodeFile(0);
+        }
+
+      } catch (err) {
+        document.getElementById('drawer-code-loading').innerHTML = `<span style="color:red;">Failed to load program details: ${err.message}</span>`;
+      }
+    }
+
+    function selectCodeFile(idx) {
+      activeFileIndex = idx;
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      tabBtns.forEach((btn, i) => btn.classList.toggle('active', i === idx));
+
+      const fileObj = activeFiles[idx] || {};
+      const codeEl = document.getElementById('code-viewer');
+      codeEl.textContent = fileObj.content || '# Empty file content';
+
+      const filename = fileObj.path || '';
+      if (filename.endsWith('.cpp') || filename.endsWith('.h') || filename.endsWith('.c')) {
+        codeEl.className = 'language-cpp';
+      } else {
+        codeEl.className = 'language-python';
+      }
+      Prism.highlightElement(codeEl);
+    }
+
+    function copyActiveCode() {
+      const fileObj = activeFiles[activeFileIndex] || {};
+      if (fileObj.content) {
+        navigator.clipboard.writeText(fileObj.content);
+        alert('Source code copied to clipboard!');
+      }
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawer-overlay').style.display = 'none';
+      document.getElementById('drawer').classList.remove('open');
+    }
+
+    loadLineage();
+  </script>
+</body>
+</html>
