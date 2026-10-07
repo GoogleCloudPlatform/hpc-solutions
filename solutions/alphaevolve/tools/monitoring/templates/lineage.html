@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AlphaEvolve Evolutionary Lineage Forest</title>
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-diff.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #f8f9fa; color: #212529; }
+    .container { max-width: 1350px; margin: 0 auto; background: white; padding: 28px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    h1 { color: #188038; margin-top: 0; font-size: 1.8em; }
+    .stats-row { display: flex; gap: 16px; margin: 16px 0; }
+    .stat-card { flex: 1; background: #f1f3f4; padding: 14px; border-radius: 8px; text-align: center; }
+    .stat-card h2 { margin: 0; font-size: 1.8em; color: #188038; }
+    .stat-card p { margin: 4px 0 0; color: #5f6368; font-weight: 500; font-size: 0.9em; }
+    
+    .exp-switcher { background: #e8f0fe; padding: 14px 18px; border-radius: 8px; border: 1px solid #d2e3fc; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    
+    .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: #fafafa; padding: 12px 16px; border: 1px solid #e0e0e0; border-radius: 8px 8px 0 0; border-bottom: none; }
+    .toolbar input, .toolbar select { padding: 7px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9em; }
+    .toolbar button { padding: 7px 14px; border-radius: 6px; border: 1px solid #1a73e8; background: #1a73e8; color: white; cursor: pointer; font-weight: 500; font-size: 0.9em; }
+    .toolbar button:hover { background: #1557b0; }
+    .toolbar button.secondary { background: white; color: #1a73e8; }
+    .toolbar button.secondary:hover { background: #e8f0fe; }
+
+    #vis-container { height: 560px; border: 1px solid #e0e0e0; border-radius: 0 0 8px 8px; background: #ffffff; position: relative; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e0e0e0; text-align: left; font-size: 0.92em; }
+    th { background: #f1f3f4; }
+    
+    .tag { background: #e6f4ea; color: #137333; padding: 3px 8px; border-radius: 12px; font-size: 0.85em; display: inline-block; margin: 2px; font-weight: 500; cursor: pointer; text-decoration: none; }
+    .tag:hover { opacity: 0.8; }
+    .tag-parent { background: #e8f0fe; color: #1a73e8; }
+    .tag-score { background: #fef7e0; color: #b06000; font-weight: 600; }
+    .tag-failed { background: #fce8e6; color: #c5221f; }
+
+    /* Inspection Modal / Drawer */
+    #drawer-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 1000; }
+    #drawer { position: fixed; top: 0; right: -105vw; width: 780px; min-width: 480px; max-width: 98vw; height: 100%; background: white; z-index: 1001; box-shadow: -4px 0 25px rgba(0,0,0,0.25); transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; }
+    #drawer.open { right: 0; }
+    #drawer.resizing { transition: none !important; user-select: none; }
+    #drawer.maximized { width: 95vw !important; }
+
+    /* Drag handle to resize drawer */
+    #drawer-resizer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 8px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 1002;
+      background: transparent;
+      transition: background 0.15s ease;
+    }
+    #drawer-resizer:hover, #drawer-resizer.active {
+      background: #1a73e8;
+    }
+
+    .drawer-header { padding: 16px 20px; border-bottom: 1px solid #e0e0e0; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .drawer-header h2 { margin: 0; font-size: 1.25em; color: #1a73e8; }
+    .drawer-close { font-size: 1.5em; cursor: pointer; color: #5f6368; border: none; background: none; padding: 2px 8px; border-radius: 4px; line-height: 1; }
+    .drawer-close:hover { background: #e8eaed; color: #202124; }
+    .drawer-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+    .drawer-section { margin-bottom: 22px; }
+    .drawer-section h4 { margin: 0 0 8px 0; color: #3c4043; font-size: 1em; border-bottom: 2px solid #e8f0fe; padding-bottom: 4px; }
+
+    /* Size control buttons */
+    .drawer-size-controls { display: flex; gap: 4px; background: #e8f0fe; padding: 3px 6px; border-radius: 6px; align-items: center; }
+    .size-btn { padding: 4px 8px; border: 1px solid #c2e7ff; background: white; color: #0b57d0; border-radius: 4px; font-size: 0.8em; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+    .size-btn:hover { background: #d3e3fd; }
+    .size-btn.active { background: #0b57d0; color: white; border-color: #0b57d0; }
+
+    .file-tabs { display: flex; gap: 4px; border-bottom: 1px solid #ccc; margin-bottom: 12px; flex-wrap: wrap; }
+    .tab-btn { padding: 6px 14px; border: 1px solid #ccc; border-bottom: none; border-radius: 6px 6px 0 0; background: #f1f3f4; cursor: pointer; font-size: 0.88em; }
+    .tab-btn.active { background: #2d2d2d; color: white; border-color: #2d2d2d; }
+    .tab-btn.tab-changed { font-weight: 600; }
+    .tab-btn.tab-changed::after { content: " •"; color: #f9ab00; }
+    .code-container { position: relative; }
+    .copy-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; cursor: pointer; font-size: 0.8em; z-index: 5; }
+    .copy-btn:hover { background: rgba(255,255,255,0.4); }
+    pre[class*="language-"] { margin: 0; border-radius: 6px; max-height: calc(100vh - 440px); min-height: 400px; transition: max-height 0.2s ease; }
+    #drawer.maximized pre[class*="language-"] { max-height: calc(100vh - 360px); }
+    pre.word-wrap code { white-space: pre-wrap !important; word-break: break-word !important; }
+
+    /* Mode toggle buttons (Code vs Diff) */
+    .mode-toggle-btn { padding: 5px 12px; border: 1px solid #1a73e8; border-radius: 4px; background: white; color: #1a73e8; font-size: 0.85em; font-weight: 500; cursor: pointer; transition: all 0.2s ease; }
+    .mode-toggle-btn:hover { background: #e8f0fe; }
+    .mode-toggle-btn.active { background: #1a73e8; color: white; }
+
+    /* Side-by-Side Diff Table */
+    #split-diff-view {
+      max-height: calc(100vh - 440px);
+      min-height: 400px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: white;
+      transition: max-height 0.2s ease;
+    }
+    #drawer.maximized #split-diff-view {
+      max-height: calc(100vh - 360px);
+    }
+    #split-diff-view.allow-scroll-x {
+      overflow-x: auto;
+    }
+    .split-diff-table {
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: collapse;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .split-diff-table th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #f6f8fa;
+      font-weight: 600;
+      padding: 7px 12px;
+      border-bottom: 1px solid #d0d7de;
+      text-align: left;
+      font-size: 11px;
+    }
+    .split-diff-table th.right-header {
+      border-left: 1px solid #d0d7de;
+    }
+    .split-diff-table td {
+      padding: 1px 6px;
+      vertical-align: top;
+      font-family: inherit;
+    }
+    .split-diff-table .diff-num {
+      width: 42px;
+      min-width: 42px;
+      max-width: 42px;
+      text-align: right;
+      padding-right: 8px;
+      color: #8c959f;
+      background: #fafbfc;
+      user-select: none;
+      border-right: 1px solid #eaecef;
+      font-size: 11px;
+    }
+    .split-diff-table .diff-num.right-num {
+      border-left: 1px solid #eaecef;
+    }
+    .split-diff-table .diff-text {
+      white-space: pre-wrap;
+      word-break: break-all;
+      overflow-wrap: break-word;
+    }
+    .split-diff-table.no-wrap {
+      table-layout: auto;
+    }
+    .split-diff-table.no-wrap .diff-text {
+      white-space: pre !important;
+      word-break: normal !important;
+    }
+    .split-diff-table tr.diff-row-delete td.diff-text.left-text,
+    .split-diff-table tr.diff-row-delete td.diff-num.left-num {
+      background-color: #ffebe9;
+      color: #cf222e;
+    }
+    .split-diff-table tr.diff-row-insert td.diff-text.right-text,
+    .split-diff-table tr.diff-row-insert td.diff-num.right-num {
+      background-color: #e6ffec;
+      color: #1a7f37;
+    }
+    .split-diff-table tr.diff-row-replace td.diff-text.left-text,
+    .split-diff-table tr.diff-row-replace td.diff-num.left-num {
+      background-color: #ffebe9;
+      color: #cf222e;
+    }
+    .split-diff-table tr.diff-row-replace td.diff-text.right-text,
+    .split-diff-table tr.diff-row-replace td.diff-num.right-num {
+      background-color: #e6ffec;
+      color: #1a7f37;
+    }
+    .split-diff-table td.empty-slot {
+      background-color: #f8f9fa;
+      color: transparent;
+      user-select: none;
+    }
+    .split-diff-table td.diff-text.left-text {
+      border-right: 1px solid #eaecef;
+    }
+    .split-diff-table tr:hover td {
+      filter: brightness(0.97);
+    }
+
+    /* Diff highlighting styles for unified view */
+    .token.inserted { color: #1a7f37 !important; background: #e6ffec !important; }
+    .token.deleted { color: #cf222e !important; background: #ffebe9 !important; }
+    .token.coord { color: #0969da !important; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" style="color: #1a73e8; text-decoration: none; font-weight: 600;">&larr; Back to Dashboard Home</a>
+    <h1>🌳 AlphaEvolve Evolutionary Lineage Forest<br><span id="page-exp-title" style="color: #1a73e8; font-size: 0.8em; font-weight: 500;">Discovering experiment...</span></h1>
+    <p>Interactive graph and directory showing parent-child-sibling evolutionary relationships across all generated candidate programs. <strong>Click any program node or tag to inspect details &amp; source code.</strong></p>
+    
+    <div class="exp-switcher">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <label for="exp-selector" style="font-weight: 600; color: #1a73e8;">Switch Active Experiment:</label>
+        <select id="exp-selector" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #1a73e8; font-size: 0.95rem; min-width: 360px; background: white;"></select>
+      </div>
+      <div id="exp-meta" style="color: #5f6368; font-size: 0.88em; font-weight: 500;"></div>
+    </div>
+
+    <div id="loading"><strong>🔍 Building interactive evolutionary forest graph...</strong></div>
+    <div id="content" style="display: none;">
+      <div class="stats-row">
+        <div class="stat-card"><h2 id="stat-nodes">0</h2><p>Total Candidate Programs</p></div>
+        <div class="stat-card"><h2 id="stat-seeds">0</h2><p>Seed / Initial Programs</p></div>
+        <div class="stat-card"><h2 id="stat-depth">0</h2><p>Max Evolutionary Depth (Generations)</p></div>
+        <div class="stat-card" style="border: 2px solid #f9ab00; background: #fffcf0; cursor: pointer;" id="stat-best-card" onclick="highlightBestProgram()" title="Click to view winning candidate in lineage forest"><h2 id="stat-best" style="color: #e37400;">-</h2><p style="font-weight: 600; color: #b06000;">🏆 Best Candidate Score</p></div>
+      </div>
+
+      <h3>Interactive Ancestry Network Graph</h3>
+      <div class="toolbar">
+        <input type="text" id="search-input" placeholder="🔍 Search Program ID..." oninput="filterGraph()">
+        <select id="gen-filter" onchange="filterGraph()">
+          <option value="all">All Generation Levels</option>
+        </select>
+        <select id="state-filter" onchange="filterGraph()">
+          <option value="all">All States (Completed, Evaluating &amp; Failed)</option>
+          <option value="COMPLETED">Completed Only</option>
+          <option value="EVALUATING">⏳ Evaluating / In Progress Only</option>
+          <option value="EVALUATION_FAILED">Failed Only</option>
+        </select>
+        <button class="secondary" onclick="fitGraph()">🎯 Fit View</button>
+        <button class="secondary" onclick="resetGraphFilters()">🔄 Reset Filters</button>
+      </div>
+      <div id="vis-container"></div>
+
+      <h3>Evolutionary Forest Directory</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Program ID</th>
+            <th>Generation</th>
+            <th>State</th>
+            <th>Primary Score</th>
+            <th>Parent Programs</th>
+            <th>Offspring / Children</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Slide-over Program Detail Drawer -->
+  <div id="drawer-overlay" onclick="closeDrawer()"></div>
+  <div id="drawer">
+    <div id="drawer-resizer" title="Drag left/right to resize drawer"></div>
+    <div class="drawer-header">
+      <div>
+        <h2 id="drawer-title">Program Details</h2>
+        <div id="drawer-subtitle" style="margin-top:4px; font-size:0.85em; color:#5f6368;"></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div class="drawer-size-controls">
+          <button class="size-btn" id="btn-size-default" onclick="setDrawerWidth(760)" title="Default width">760px</button>
+          <button class="size-btn" id="btn-size-wide" onclick="setDrawerWidth(1050)" title="Wide view">1050px</button>
+          <button class="size-btn" id="btn-size-max" onclick="toggleMaximizeDrawer()" title="Toggle full-screen maximize">⛶ Maximize</button>
+        </div>
+        <button class="drawer-close" onclick="closeDrawer()">&times;</button>
+      </div>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <h4>📊 Performance Scores &amp; Evaluation Metrics</h4>
+        <div id="drawer-scores"></div>
+      </div>
+
+      <div class="drawer-section">
+        <h4>🌿 Evolutionary Lineage Relationships</h4>
+        <div id="drawer-lineage-links"></div>
+      </div>
+
+      <div class="drawer-section" id="drawer-insights-section" style="display:none;">
+        <h4>⚠️ Evaluation Log &amp; Insights</h4>
+        <div id="drawer-insights" style="background:#fce8e6; padding:12px; border-radius:6px; font-size:0.88em; color:#c5221f;"></div>
+      </div>
+
+      <div class="drawer-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <h4 style="margin: 0; border-bottom: none; padding-bottom: 0;">💻 Candidate Code &amp; Changes</h4>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button id="btn-toggle-wrap" class="mode-toggle-btn active" onclick="toggleWordWrap()" title="Toggle code word wrapping">↩ Wrap</button>
+            <button id="btn-mode-code" class="mode-toggle-btn active" onclick="switchDrawerMode('code')">📄 Source Code</button>
+            <button id="btn-mode-diff" class="mode-toggle-btn" onclick="switchDrawerMode('diff')">🔀 Code Diff</button>
+          </div>
+        </div>
+
+        <div id="diff-controls" style="display: none; background: #f1f3f4; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <label for="diff-base-select" style="font-size: 0.88em; font-weight: 600; color: #3c4043;">Compare against:</label>
+            <select id="diff-base-select" onchange="onDiffBaseChanged()" style="padding: 6px 10px; font-size: 0.88em; border-radius: 4px; border: 1px solid #dadce0; background: white; cursor: pointer;">
+            </select>
+            <div style="display: flex; gap: 4px; margin-left: 6px;">
+              <button id="btn-diff-split" class="size-btn active" onclick="switchDiffView('split')" title="Side-by-side split diff comparison">◫ Side-by-Side</button>
+              <button id="btn-diff-unified" class="size-btn" onclick="switchDiffView('unified')" title="Unified single-stream diff">☰ Unified</button>
+            </div>
+            <button id="btn-explain-diff" class="size-btn" onclick="requestAiExplanation()" style="background: #1a73e8; color: white; border: 1px solid #1a73e8; font-weight: 600; margin-left: 6px;" title="Analyze evolution and explain score deltas with Vertex AI Gemini">✨ Explain Evolution (Gemini)</button>
+          </div>
+          <div id="diff-status-text" style="font-size: 0.85em; color: #5f6368; font-style: italic;"></div>
+        </div>
+
+        <!-- AI Evolution Explanation Box -->
+        <div id="ai-explanation-box" style="display: none; background: #ffffff; border: 1px solid #c2e7ff; border-left: 4px solid #1a73e8; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.05em; font-weight: 700; color: #1a73e8;">✨ Vertex AI Evolution Analysis</span>
+              <span id="ai-cache-badge" style="font-size: 0.75em; padding: 2px 8px; border-radius: 12px; font-weight: 600; display: none;"></span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span id="ai-score-delta-badge" style="font-size: 0.82em; font-weight: 700; padding: 3px 10px; border-radius: 14px; display: none;"></span>
+              <button onclick="toggleAiExplanation()" id="btn-toggle-ai-box" style="background: none; border: none; cursor: pointer; color: #5f6368; font-size: 0.85em; font-weight: 600;" title="Collapse/Expand">▲ Minimize</button>
+            </div>
+          </div>
+          <div id="ai-explanation-loading" style="display: none; color: #5f6368; font-size: 0.9em; padding: 10px 0;">
+            <span style="display:inline-block; width:14px; height:14px; border:2px solid #1a73e8; border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:middle; margin-right:8px;"></span>
+            Analyzing candidate mutations and score shifts with Vertex AI <strong>gemini-2.5-flash</strong>...
+          </div>
+          <div id="ai-explanation-content" class="markdown-body" style="font-size: 0.92em; line-height: 1.6; color: #202124;"></div>
+        </div>
+
+        <div id="drawer-code-loading"><em>Loading unflattened source code files...</em></div>
+        <div id="drawer-code-container" style="display:none;">
+          <div class="file-tabs" id="file-tabs"></div>
+          <div class="code-container">
+            <button class="copy-btn" id="drawer-copy-btn" onclick="copyActiveCode()">📋 Copy Code</button>
+            <div id="split-diff-view" style="display:none;">
+              <table class="split-diff-table" id="split-diff-table">
+                <colgroup>
+                  <col style="width: 42px;">
+                  <col style="width: calc(50% - 42px);">
+                  <col style="width: 42px;">
+                  <col style="width: calc(50% - 42px);">
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th colspan="2" id="split-header-left">Base Program</th>
+                    <th colspan="2" id="split-header-right" class="right-header">Candidate Program</th>
+                  </tr>
+                </thead>
+                <tbody id="split-diff-tbody"></tbody>
+              </table>
+            </div>
+            <div id="unified-code-view">
+              <pre class="word-wrap"><code id="code-viewer" class="language-python"></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let network = null;
+    let nodesDataSet = null;
+    let edgesDataSet = null;
+    let rawLineageData = null;
+    let currentExp = null;
+    let activeFiles = [];
+    let activeFileIndex = 0;
+
+    async function loadLineage() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentExp = urlParams.get('exp');
+
+        const expsRes = await fetch('/api/experiments');
+        const expsData = await expsRes.json();
+        const exps = expsData.experiments || [];
+        const selector = document.getElementById('exp-selector');
+        selector.innerHTML = '';
+
+        if (exps.length === 0 && !currentExp) {
+          document.getElementById('loading').innerHTML = '<span style="color: red;">No experiments discovered in this project.</span>';
+          return;
+        }
+
+        exps.forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.name;
+          const t = (e.config && e.config.title) ? e.config.title : e.name.split('/').pop();
+          opt.textContent = `${t} (${e.state || 'UNSPECIFIED'}) - ${e.name.split('/').pop()}`;
+          selector.appendChild(opt);
+        });
+
+        if (!currentExp && exps.length > 0) {
+          currentExp = exps[0].name;
+        }
+        if (currentExp) {
+          selector.value = currentExp;
+        }
+
+        const selectedExpObj = exps.find(e => e.name === currentExp);
+        const titleText = selectedExpObj && selectedExpObj.config && selectedExpObj.config.title
+          ? selectedExpObj.config.title
+          : (currentExp ? currentExp.split('/').pop() : 'Unknown Experiment');
+        const shortId = currentExp ? currentExp.split('/').pop() : '';
+        document.getElementById('page-exp-title').innerText = `${titleText} [ID: ${shortId}]`;
+        document.getElementById('exp-meta').innerText = selectedExpObj ? `Language: ${selectedExpObj.config?.programLanguage || 'unknown'} | Status: ${selectedExpObj.state}` : '';
+
+        selector.onchange = function() {
+          window.location.search = '?exp=' + encodeURIComponent(this.value);
+        };
+
+        const res = await fetch('/api/lineage?exp=' + encodeURIComponent(currentExp));
+        rawLineageData = await res.json();
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+        document.getElementById('stat-nodes').innerText = rawLineageData.total_nodes || 0;
+        document.getElementById('stat-seeds').innerText = (rawLineageData.seed_programs || []).length;
+        document.getElementById('stat-depth').innerText = rawLineageData.max_evolution_depth || 0;
+
+        let bestProgId = rawLineageData.best_program_id;
+        if (!bestProgId) {
+          let maxSc = -Infinity;
+          for (const [pid, details] of Object.entries(rawLineageData.node_details || {})) {
+            if (details.target_score !== undefined && details.target_score !== null && typeof details.target_score === 'number') {
+              if (details.target_score > maxSc) {
+                maxSc = details.target_score;
+                bestProgId = pid;
+              }
+            }
+          }
+        }
+        currentBestProgId = bestProgId;
+        const bestDetails = (rawLineageData.node_details || {})[bestProgId] || {};
+        const bestSc = bestDetails.target_score;
+        document.getElementById('stat-best').innerText = (bestSc !== undefined && bestSc !== null)
+          ? (typeof bestSc === 'number' ? bestSc.toFixed(4) : bestSc)
+          : 'N/A';
+
+        // Populate Generation Filter dropdown
+        const genSelect = document.getElementById('gen-filter');
+        genSelect.innerHTML = '<option value="all">All Generation Levels</option>';
+        const maxDepth = rawLineageData.max_evolution_depth || 0;
+        for (let d = 0; d <= maxDepth; d++) {
+          const opt = document.createElement('option');
+          opt.value = d;
+          opt.textContent = `Gen ${d}`;
+          genSelect.appendChild(opt);
+        }
+
+        buildDirectoryTable(rawLineageData);
+        buildVisNetwork(rawLineageData);
+
+      } catch (err) {
+        document.getElementById('loading').innerHTML = '<span style="color: red;">Error loading lineage: ' + err.message + '</span>';
+      }
+    }
+
+    let currentBestProgId = null;
+
+    function highlightBestProgram() {
+      if (!currentBestProgId) return;
+      if (network) {
+        network.selectNodes([currentBestProgId]);
+        network.focus(currentBestProgId, {
+          scale: 1.2,
+          animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+        });
+      }
+      openProgramDrawer(currentBestProgId);
+    }
+
+    function isProgramFailed(details, pid, seedPrograms) {
+      const st = (details.state || '').toUpperCase();
+      if (st.includes('FAIL') || st.includes('ERROR')) return true;
+      if (st.includes('EVALUATING') || st.includes('RUNNING') || st.includes('CREATED') || st.includes('UNSPECIFIED')) return false;
+      if (details.insights && details.insights.some(i => i.toLowerCase().includes('error') || i.toLowerCase().includes('fail'))) return true;
+      const isSeed = seedPrograms && seedPrograms.includes(pid);
+      if (!isSeed && st.includes('COMPLETED') && (details.target_score === null || details.target_score === undefined)) {
+        if (!details.scores || Object.keys(details.scores).length === 0) return true;
+      }
+      return false;
+    }
+
+    function buildDirectoryTable(data) {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      const nodeDetails = data.node_details || {};
+      const depthMap = data.program_depths || {};
+      const seedPrograms = data.seed_programs || [];
+      const bestProgId = currentBestProgId;
+      const allNodes = Object.keys(data.child_to_parents || {}).sort((a,b) => (depthMap[a]||0) - (depthMap[b]||0));
+
+      allNodes.forEach(pid => {
+        const details = nodeDetails[pid] || {};
+        const depth = depthMap[pid] !== undefined ? `Gen ${depthMap[pid]}` : 'Gen 0';
+        const failed = isProgramFailed(details, pid, seedPrograms);
+        const stStr = (details.state || '').toUpperCase();
+        const isEval = stStr.includes('EVALUATING') || stStr.includes('RUNNING') || stStr.includes('CREATED');
+        const isBest = (bestProgId && pid === bestProgId);
+        const scoreVal = details.target_score !== undefined && details.target_score !== null
+          ? (typeof details.target_score === 'number' ? details.target_score.toFixed(4) : details.target_score)
+          : (isEval ? 'Evaluating...' : 'N/A');
+        
+        const parents = (details.parent_ids || []).map(p => `<span class="tag tag-parent" onclick="openProgramDrawer('${p}')">${p}</span>`).join(' ');
+        const children = (details.children_ids || []).map(c => `<span class="tag" onclick="openProgramDrawer('${c}')">${c}</span>`).join(' ');
+
+        const stateBadge = failed
+          ? '<span class="tag tag-failed">FAILED</span>'
+          : (isEval ? '<span class="tag" style="background:#fef7e0;color:#b06000;">⏳ EVALUATING</span>' : '<span class="tag" style="background:#e6f4ea;color:#137333;">COMPLETED</span>');
+
+        const scoreTag = isBest
+          ? `<span class="tag" style="background:#fff3e0;color:#b06000;font-weight:700;border:1px solid #f9ab00;">⭐ ${scoreVal}</span>`
+          : `<span class="tag tag-score">${scoreVal}</span>`;
+
+        const inspectBtn = isBest
+          ? `<button style="background:#f9ab00;color:white;border:none;padding:4px 10px;font-size:0.82em;border-radius:4px;font-weight:600;cursor:pointer;" onclick="openProgramDrawer('${pid}')">🏆 Inspect Best Code</button>`
+          : `<button class="secondary" style="padding:4px 8px;font-size:0.82em;" onclick="openProgramDrawer('${pid}')">🔍 Inspect Code</button>`;
+
+        const tr = document.createElement('tr');
+        tr.dataset.pid = pid;
+        if (isBest) {
+          tr.style.background = '#fffcf0';
+          tr.style.borderLeft = '4px solid #f9ab00';
+        }
+        tr.innerHTML = `
+          <td><strong style="color:#1a73e8;cursor:pointer;" onclick="openProgramDrawer('${pid}')">${pid}</strong>${isBest ? ' <span class="tag" style="background:#f9ab00;color:white;font-weight:700;padding:2px 8px;border-radius:12px;margin-left:6px;font-size:0.78em;">🏆 BEST</span>' : ''}</td>
+          <td><span class="tag" style="background:#f1f3f4;color:#212529;">${depth}</span></td>
+          <td>${stateBadge}</td>
+          <td>${scoreTag}</td>
+          <td>${parents || '<em>Seed</em>'}</td>
+          <td>${children || '<em>Leaf</em>'}</td>
+          <td>${inspectBtn}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function buildVisNetwork(data) {
+      const container = document.getElementById('vis-container');
+      const nodeDetails = data.node_details || {};
+      const depthMap = data.program_depths || {};
+      const parentsMap = data.parent_to_children || {};
+      const seedPrograms = data.seed_programs || [];
+      const bestProgId = currentBestProgId;
+
+      const visNodes = [];
+      const visEdges = [];
+
+      Object.keys(data.child_to_parents || {}).forEach(pid => {
+        const details = nodeDetails[pid] || {};
+        const depth = depthMap[pid] !== undefined ? depthMap[pid] : 0;
+        const isSeed = seedPrograms.includes(pid);
+        const isBest = (bestProgId && pid === bestProgId);
+        const isFailed = isProgramFailed(details, pid, seedPrograms);
+
+        const stStr = (details.state || '').toUpperCase();
+        const isEval = stStr.includes('EVALUATING') || stStr.includes('RUNNING') || stStr.includes('CREATED');
+        const scoreVal = details.target_score !== undefined && details.target_score !== null
+          ? (typeof details.target_score === 'number' ? details.target_score.toFixed(3) : details.target_score)
+          : null;
+
+        let bgCol = isBest ? '#fff8e1' : (isFailed ? '#fce8e6' : (scoreVal !== null ? '#e6f4ea' : (isEval ? '#fef7e0' : (isSeed ? '#e8f0fe' : '#ffffff'))));
+        let borderCol = isBest ? '#f9ab00' : (isFailed ? '#d93025' : (isSeed ? '#1a73e8' : (isEval ? '#e37400' : '#bdc1c6')));
+        let textCol = isFailed ? '#c5221f' : '#212529';
+
+        let labelText = isBest ? `🏆 [G${depth}] Prog ${pid} (BEST)` : `[G${depth}] Prog ${pid}`;
+        if (scoreVal !== null) labelText += (isBest ? `\n⭐ Score: ${scoreVal}` : `\nScore: ${scoreVal}`);
+        else if (isFailed) labelText += `\n[FAILED]`;
+        else if (isEval) labelText += `\n[⏳ EVALUATING]`;
+
+        visNodes.push({
+          id: pid,
+          label: labelText,
+          level: depth,
+          shape: isSeed ? 'diamond' : 'box',
+          margin: 10,
+          color: {
+            background: bgCol,
+            border: borderCol,
+            highlight: { background: '#fff8e1', border: '#f9ab00' }
+          },
+          font: { color: textCol, face: 'Roboto, sans-serif', size: isBest ? 14 : 13, bold: isBest, multi: true },
+          borderWidth: isBest ? 4 : (isSeed ? 3 : 2),
+          shadow: true,
+          title: `${isBest ? '<strong style="color:#e37400;">🏆 TOP-RANKED CANDIDATE</strong><br>' : ''}Program ID: ${pid}<br>Gen: ${depth}<br>State: ${isFailed ? 'FAILED' : (details.state || 'N/A')}<br>Score: ${scoreVal !== null ? scoreVal : 'N/A'}`
+        });
+      });
+
+      for (const [parent, children] of Object.entries(parentsMap)) {
+        for (const child of children) {
+          visEdges.push({
+            from: parent,
+            to: child,
+            arrows: 'to',
+            color: { color: '#bdc1c6', highlight: '#1a73e8' },
+            smooth: { type: 'cubicBezier', forceDirection: 'horizontal' }
+          });
+        }
+      }
+
+      nodesDataSet = new vis.DataSet(visNodes);
+      edgesDataSet = new vis.DataSet(visEdges);
+
+      const options = {
+        layout: {
+          hierarchical: {
+            direction: 'LR',
+            sortMethod: 'directed',
+            levelSeparation: 180,
+            nodeSpacing: 90
+          }
+        },
+        physics: false,
+        interaction: { hover: true, tooltipDelay: 150 }
+      };
+
+      network = new vis.Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
+
+      network.on("click", function(params) {
+        if (params.nodes.length > 0) {
+          const selectedNodeId = params.nodes[0];
+          openProgramDrawer(selectedNodeId);
+        }
+      });
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const autoProg = urlParams.get('prog');
+      if (autoProg && visNodes.some(n => n.id === autoProg)) {
+        setTimeout(() => {
+          network.selectNodes([autoProg]);
+          network.focus(autoProg, { scale: 1.15, animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+          openProgramDrawer(autoProg);
+        }, 300);
+      }
+    }
+
+    function filterGraph() {
+      if (!nodesDataSet || !rawLineageData) return;
+      const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+      const genVal = document.getElementById('gen-filter').value;
+      const stateVal = document.getElementById('state-filter').value;
+      const nodeDetails = rawLineageData.node_details || {};
+      const depthMap = rawLineageData.program_depths || {};
+      const seedPrograms = rawLineageData.seed_programs || [];
+
+      const allNodes = Object.keys(rawLineageData.child_to_parents || {});
+      allNodes.forEach(pid => {
+        const details = nodeDetails[pid] || {};
+        const depth = depthMap[pid] !== undefined ? depthMap[pid] : 0;
+        const failed = isProgramFailed(details, pid, seedPrograms);
+
+        const stStr = (details.state || '').toUpperCase();
+        const isEval = stStr === 'EVALUATING' || stStr === 'RUNNING' || stStr === 'CREATED';
+
+        const matchSearch = !searchVal || pid.toLowerCase().includes(searchVal);
+        const matchGen = genVal === 'all' || depth.toString() === genVal;
+        
+        let matchState = true;
+        if (stateVal === 'COMPLETED') {
+          matchState = !failed && !isEval;
+        } else if (stateVal === 'EVALUATING') {
+          matchState = isEval;
+        } else if (stateVal === 'EVALUATION_FAILED' || stateVal === 'FAILED') {
+          matchState = failed;
+        }
+
+        if (matchSearch && matchGen && matchState) {
+          nodesDataSet.update({ id: pid, hidden: false });
+        } else {
+          nodesDataSet.update({ id: pid, hidden: true });
+        }
+      });
+
+      const trs = document.querySelectorAll('#table-body tr');
+      trs.forEach(tr => {
+        const pid = tr.dataset.pid;
+        const details = nodeDetails[pid] || {};
+        const depth = depthMap[pid] !== undefined ? depthMap[pid] : 0;
+        const failed = isProgramFailed(details, pid, seedPrograms);
+        const stStr = (details.state || '').toUpperCase();
+        const isEval = stStr === 'EVALUATING' || stStr === 'RUNNING' || stStr === 'CREATED';
+
+        const matchSearch = !searchVal || pid.toLowerCase().includes(searchVal);
+        const matchGen = genVal === 'all' || depth.toString() === genVal;
+        let matchState = true;
+        if (stateVal === 'COMPLETED') matchState = !failed && !isEval;
+        else if (stateVal === 'EVALUATING') matchState = isEval;
+        else if (stateVal === 'EVALUATION_FAILED' || stateVal === 'FAILED') matchState = failed;
+
+        tr.style.display = (matchSearch && matchGen && matchState) ? '' : 'none';
+      });
+    }
+
+    function fitGraph() {
+      if (network) network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+    }
+
+    function resetGraphFilters() {
+      document.getElementById('search-input').value = '';
+      document.getElementById('gen-filter').value = 'all';
+      document.getElementById('state-filter').value = 'all';
+      filterGraph();
+      fitGraph();
+    }
+
+    let currentDrawerProgId = null;
+    let currentDrawerMode = 'code';
+    let currentDrawerData = null;
+    let currentDiffData = null;
+
+    async function openProgramDrawer(progId) {
+      currentDrawerProgId = progId;
+      currentDrawerMode = 'code';
+      currentDiffData = null;
+
+      document.getElementById('drawer-overlay').style.display = 'block';
+      const drawer = document.getElementById('drawer');
+      drawer.classList.add('open');
+
+      document.getElementById('drawer-title').innerText = `Program ${progId}`;
+      document.getElementById('drawer-subtitle').innerText = `Experiment: ${currentExp ? currentExp.split('/').pop() : ''}`;
+
+      // Reset mode buttons and diff controls
+      document.getElementById('btn-mode-code').classList.add('active');
+      document.getElementById('btn-mode-diff').classList.remove('active');
+      document.getElementById('diff-controls').style.display = 'none';
+      document.getElementById('ai-explanation-box').style.display = 'none';
+      document.getElementById('drawer-copy-btn').innerText = '📋 Copy Code';
+
+      document.getElementById('drawer-code-loading').style.display = 'block';
+      document.getElementById('drawer-code-loading').innerText = 'Loading unflattened source code files...';
+      document.getElementById('drawer-code-container').style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/program_code?exp=${encodeURIComponent(currentExp)}&prog=${encodeURIComponent(progId)}`);
+        const data = await res.json();
+        currentDrawerData = data;
+
+        // Render Scores
+        const scoresContainer = document.getElementById('drawer-scores');
+        const scores = data.scores || {};
+        if (Object.keys(scores).length === 0) {
+          scoresContainer.innerHTML = '<p style="color:#5f6368;font-size:0.9em;"><em>No evaluation scores returned (Program failed or unrated).</em></p>';
+        } else {
+          let scoreHtml = '<table style="margin-top:0;"><thead><tr><th>Metric Name</th><th>Value</th></tr></thead><tbody>';
+          for (const [k, v] of Object.entries(scores)) {
+            const displayVal = typeof v === 'number' ? v.toFixed(6) : v;
+            scoreHtml += `<tr><td><strong>${k}</strong></td><td><code>${displayVal}</code></td></tr>`;
+          }
+          scoreHtml += '</tbody></table>';
+          scoresContainer.innerHTML = scoreHtml;
+        }
+
+        // Render Lineage Links
+        const lineageContainer = document.getElementById('drawer-lineage-links');
+        const parents = (data.parent_ids || []).map(p => `<span class="tag tag-parent" onclick="openProgramDrawer('${p}')">Parent ${p}</span>`).join(' ');
+        lineageContainer.innerHTML = parents ? parents : '<em>Seed Program (No Parent)</em>';
+
+        // Setup Diff Comparator Dropdown
+        populateDiffComparator(data, progId);
+
+        // Render Insights / Failure Log
+        const insightsSec = document.getElementById('drawer-insights-section');
+        const insightsDiv = document.getElementById('drawer-insights');
+        const insights = data.insights || [];
+        if (data.state === 'EVALUATION_FAILED' || insights.length > 0) {
+          insightsSec.style.display = 'block';
+          insightsDiv.innerHTML = insights.length > 0 ? insights.join('<br>') : `State: ${data.state}`;
+        } else {
+          insightsSec.style.display = 'none';
+        }
+
+        // Render Code Files Tabs in Code Mode
+        renderCodeTabs(data.files || []);
+
+      } catch (err) {
+        document.getElementById('drawer-code-loading').innerHTML = `<span style="color:red;">Failed to load program details: ${err.message}</span>`;
+      }
+    }
+
+    function populateDiffComparator(data, progId) {
+      const select = document.getElementById('diff-base-select');
+      select.innerHTML = '';
+      const parents = data.parent_ids || [];
+      const seedPrograms = (rawLineageData && rawLineageData.seed_programs) || [];
+      const bestId = currentBestProgId;
+
+      // 1. Parent options (default selection when available)
+      if (parents.length === 1) {
+        const opt = document.createElement('option');
+        opt.value = parents[0];
+        opt.innerText = `Parent Program (${parents[0]})`;
+        opt.selected = true;
+        select.appendChild(opt);
+      } else if (parents.length > 1) {
+        parents.forEach((p, idx) => {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.innerText = `Parent ${idx + 1} (${p})`;
+          if (idx === 0) opt.selected = true;
+          select.appendChild(opt);
+        });
+      }
+
+      // 2. Seed program options
+      seedPrograms.forEach(s => {
+        if (s !== progId && !parents.includes(s)) {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.innerText = `Seed Program (${s})`;
+          if (parents.length === 0 && !select.value) opt.selected = true;
+          select.appendChild(opt);
+        }
+      });
+
+      // 3. Best candidate option
+      if (bestId && bestId !== progId && !parents.includes(bestId) && !seedPrograms.includes(bestId)) {
+        const opt = document.createElement('option');
+        opt.value = bestId;
+        opt.innerText = `🏆 Best Program (${bestId})`;
+        if (!select.value) opt.selected = true;
+        select.appendChild(opt);
+      }
+
+      // 4. Custom ID option
+      const customOpt = document.createElement('option');
+      customOpt.value = '__custom__';
+      customOpt.innerText = '✏️ Enter Custom Program ID...';
+      select.appendChild(customOpt);
+    }
+
+    function switchDrawerMode(mode) {
+      if (mode === currentDrawerMode) return;
+      currentDrawerMode = mode;
+      document.getElementById('btn-mode-code').classList.toggle('active', mode === 'code');
+      document.getElementById('btn-mode-diff').classList.toggle('active', mode === 'diff');
+
+      if (mode === 'code') {
+        document.getElementById('diff-controls').style.display = 'none';
+        document.getElementById('ai-explanation-box').style.display = 'none';
+        document.getElementById('drawer-copy-btn').innerText = '📋 Copy Code';
+        document.getElementById('split-diff-view').style.display = 'none';
+        document.getElementById('unified-code-view').style.display = 'block';
+        if (currentDrawerData) {
+          renderCodeTabs(currentDrawerData.files || []);
+        }
+      } else {
+        document.getElementById('diff-controls').style.display = 'flex';
+        document.getElementById('drawer-copy-btn').innerText = '📋 Copy Diff';
+        fetchAndRenderDiff();
+      }
+    }
+
+    async function onDiffBaseChanged() {
+      document.getElementById('ai-explanation-box').style.display = 'none';
+      const select = document.getElementById('diff-base-select');
+      if (select.value === '__custom__') {
+        const customId = prompt('Enter the Program ID to compare against:');
+        if (customId && customId.trim()) {
+          const trimmed = customId.trim();
+          let opt = Array.from(select.options).find(o => o.value === trimmed);
+          if (!opt) {
+            opt = document.createElement('option');
+            opt.value = trimmed;
+            opt.innerText = `Program (${trimmed})`;
+            select.insertBefore(opt, select.firstChild);
+          }
+          select.value = trimmed;
+        } else {
+          select.selectedIndex = 0;
+        }
+      }
+      fetchAndRenderDiff();
+    }
+
+    async function fetchAndRenderDiff() {
+      const select = document.getElementById('diff-base-select');
+      const baseProgId = select.value;
+      if (!baseProgId || baseProgId === '__custom__') return;
+
+      const statusText = document.getElementById('diff-status-text');
+      statusText.innerText = `Comparing ${currentDrawerProgId} vs ${baseProgId}...`;
+
+      document.getElementById('drawer-code-loading').style.display = 'block';
+      document.getElementById('drawer-code-loading').innerText = `Generating code diff against ${baseProgId}...`;
+      document.getElementById('drawer-code-container').style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/program_diff?exp=${encodeURIComponent(currentExp)}&prog=${encodeURIComponent(currentDrawerProgId)}&base=${encodeURIComponent(baseProgId)}`);
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Failed to calculate diff');
+        }
+        const diffData = await res.json();
+        currentDiffData = diffData;
+        statusText.innerText = `Diff vs ${baseProgId}`;
+
+        renderDiffTabs(diffData.files || []);
+
+      } catch (err) {
+        document.getElementById('drawer-code-loading').innerHTML = `<span style="color:red;">Failed to compute diff: ${err.message}</span>`;
+        statusText.innerText = 'Diff failed';
+      }
+    }
+
+    // AI Evolution Explanation (Vertex AI Gemini 2.5 Flash)
+    let currentExplanationData = null;
+    let isAiExplanationCollapsed = false;
+
+    function renderMarkdown(md) {
+      if (!md) return '';
+      if (window.marked && typeof window.marked.parse === 'function') {
+        try {
+          return window.marked.parse(md);
+        } catch (e) {
+          console.warn('marked.js parse failed, falling back:', e);
+        }
+      }
+      return md
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/^### (.*$)/gim, '<h4 style="margin:10px 0 4px 0; color:#1a73e8;">$1</h4>')
+        .replace(/^## (.*$)/gim, '<h3 style="margin:12px 0 6px 0; color:#202124;">$1</h3>')
+        .replace(/^# (.*$)/gim, '<h3 style="margin:12px 0 6px 0; color:#202124;">$1</h3>')
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+        .replace(/`([^`]+)`/gim, '<code style="background:#f1f3f4; padding:2px 5px; border-radius:3px;">$1</code>')
+        .replace(/^[\*\-] (.*$)/gim, '<li style="margin-bottom:4px;">$1</li>')
+        .replace(/\n\n/gim, '<br><br>');
+    }
+
+    function toggleAiExplanation() {
+      const contentEl = document.getElementById('ai-explanation-content');
+      const toggleBtn = document.getElementById('btn-toggle-ai-box');
+      isAiExplanationCollapsed = !isAiExplanationCollapsed;
+      contentEl.style.display = isAiExplanationCollapsed ? 'none' : 'block';
+      toggleBtn.innerText = isAiExplanationCollapsed ? '▼ Expand' : '▲ Minimize';
+    }
+
+    async function requestAiExplanation() {
+      const select = document.getElementById('diff-base-select');
+      const baseProgId = select.value;
+      if (!baseProgId || baseProgId === '__custom__') {
+        alert('Please select a valid base program to compare against.');
+        return;
+      }
+
+      const box = document.getElementById('ai-explanation-box');
+      const loadingEl = document.getElementById('ai-explanation-loading');
+      const contentEl = document.getElementById('ai-explanation-content');
+      const cacheBadge = document.getElementById('ai-cache-badge');
+      const deltaBadge = document.getElementById('ai-score-delta-badge');
+      const explainBtn = document.getElementById('btn-explain-diff');
+
+      box.style.display = 'block';
+      loadingEl.style.display = 'block';
+      contentEl.innerHTML = '';
+      contentEl.style.display = 'block';
+      isAiExplanationCollapsed = false;
+      document.getElementById('btn-toggle-ai-box').innerText = '▲ Minimize';
+      cacheBadge.style.display = 'none';
+      deltaBadge.style.display = 'none';
+      explainBtn.disabled = true;
+      explainBtn.style.opacity = '0.6';
+
+      try {
+        const res = await fetch(`/api/explain_evolution?exp=${encodeURIComponent(currentExp)}&prog=${encodeURIComponent(currentDrawerProgId)}&base=${encodeURIComponent(baseProgId)}`);
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Failed to generate explanation');
+        }
+        const data = await res.json();
+        currentExplanationData = data;
+
+        // Render cache badge
+        cacheBadge.style.display = 'inline-block';
+        if (data.cached) {
+          cacheBadge.innerText = '⚡ Cached ($0.00)';
+          cacheBadge.style.background = '#e6f4ea';
+          cacheBadge.style.color = '#137333';
+        } else {
+          cacheBadge.innerText = `✨ ${data.model || 'Gemini 2.5 Flash'}`;
+          cacheBadge.style.background = '#e8f0fe';
+          cacheBadge.style.color = '#1967d2';
+        }
+
+        // Render score delta badge
+        deltaBadge.style.display = 'inline-block';
+        let trendColor = '#5f6368';
+        let trendBg = '#f1f3f4';
+        let trendText = 'Score Unchanged';
+
+        if (data.score_deltas) {
+          const metrics = Object.keys(data.score_deltas);
+          if (metrics.length > 0) {
+            const firstMetric = metrics[0];
+            const s = data.score_deltas[firstMetric];
+            if (s.trend === 'improved') {
+              trendColor = '#137333';
+              trendBg = '#e6f4ea';
+              const pctStr = s.percent_change !== null ? ` (+${s.percent_change}%)` : '';
+              trendText = `▲ Score Improved: ${s.base !== null ? s.base.toFixed(4) : ''} ➜ ${s.candidate !== null ? s.candidate.toFixed(4) : ''}${pctStr}`;
+            } else if (s.trend === 'dropped') {
+              trendColor = '#c5221f';
+              trendBg = '#fce8e6';
+              const pctStr = s.percent_change !== null ? ` (${s.percent_change}%)` : '';
+              trendText = `▼ Score Dropped: ${s.base !== null ? s.base.toFixed(4) : ''} ➜ ${s.candidate !== null ? s.candidate.toFixed(4) : ''}${pctStr}`;
+            } else {
+              trendText = `◆ Score Steady: ${s.candidate !== null ? s.candidate.toFixed(4) : '-'}`;
+            }
+          }
+        }
+        deltaBadge.innerText = trendText;
+        deltaBadge.style.color = trendColor;
+        deltaBadge.style.background = trendBg;
+
+        // Render markdown body
+        contentEl.innerHTML = renderMarkdown(data.explanation || 'No explanation generated.');
+      } catch (err) {
+        contentEl.innerHTML = `<div style="color: #c5221f; padding: 6px 0;"><strong>Error generating AI explanation:</strong> ${err.message}</div>`;
+      } finally {
+        loadingEl.style.display = 'none';
+        explainBtn.disabled = false;
+        explainBtn.style.opacity = '1';
+      }
+    }
+
+    let currentDiffViewType = 'split';
+
+    function switchDiffView(viewType) {
+      currentDiffViewType = viewType;
+      document.getElementById('btn-diff-split').classList.toggle('active', viewType === 'split');
+      document.getElementById('btn-diff-unified').classList.toggle('active', viewType === 'unified');
+      if (activeFiles && activeFiles[activeFileIndex]) {
+        selectDiffFile(activeFileIndex);
+      }
+    }
+
+    function renderCodeTabs(files) {
+      activeFiles = files;
+      activeFileIndex = 0;
+      document.getElementById('drawer-code-loading').style.display = 'none';
+      document.getElementById('drawer-code-container').style.display = 'block';
+      document.getElementById('split-diff-view').style.display = 'none';
+      document.getElementById('unified-code-view').style.display = 'block';
+
+      const tabsDiv = document.getElementById('file-tabs');
+      tabsDiv.innerHTML = '';
+      if (activeFiles.length === 0) {
+        tabsDiv.innerHTML = '<em>No source code files attached.</em>';
+        document.getElementById('code-viewer').textContent = '# No source code available.';
+      } else {
+        activeFiles.forEach((fileObj, idx) => {
+          const btn = document.createElement('button');
+          btn.className = `tab-btn ${idx === 0 ? 'active' : ''}`;
+          btn.innerText = fileObj.path || `file_${idx}.py`;
+          btn.onclick = () => selectCodeFile(idx);
+          tabsDiv.appendChild(btn);
+        });
+        selectCodeFile(0);
+      }
+    }
+
+    function renderDiffTabs(diffFiles) {
+      activeFiles = diffFiles;
+      activeFileIndex = 0;
+      document.getElementById('drawer-code-loading').style.display = 'none';
+      document.getElementById('drawer-code-container').style.display = 'block';
+
+      const tabsDiv = document.getElementById('file-tabs');
+      tabsDiv.innerHTML = '';
+      if (activeFiles.length === 0) {
+        tabsDiv.innerHTML = '<em>No files found to compare.</em>';
+        document.getElementById('code-viewer').textContent = '# No files compared.';
+        document.getElementById('split-diff-view').style.display = 'none';
+        document.getElementById('unified-code-view').style.display = 'block';
+      } else {
+        activeFiles.forEach((fileObj, idx) => {
+          const btn = document.createElement('button');
+          const hasChange = fileObj.has_changes;
+          btn.className = `tab-btn ${idx === 0 ? 'active' : ''} ${hasChange ? 'tab-changed' : ''}`;
+          btn.innerText = fileObj.path || `file_${idx}.py`;
+          if (fileObj.is_new) btn.innerText += ' [new]';
+          else if (fileObj.is_deleted) btn.innerText += ' [deleted]';
+          btn.onclick = () => selectDiffFile(idx);
+          tabsDiv.appendChild(btn);
+        });
+        selectDiffFile(0);
+      }
+    }
+
+    function selectCodeFile(idx) {
+      activeFileIndex = idx;
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      tabBtns.forEach((btn, i) => btn.classList.toggle('active', i === idx));
+
+      document.getElementById('split-diff-view').style.display = 'none';
+      document.getElementById('unified-code-view').style.display = 'block';
+
+      const fileObj = activeFiles[idx] || {};
+      const codeEl = document.getElementById('code-viewer');
+      codeEl.textContent = fileObj.content || '# Empty file content';
+
+      const filename = fileObj.path || '';
+      if (filename.endsWith('.cpp') || filename.endsWith('.h') || filename.endsWith('.c')) {
+        codeEl.className = 'language-cpp';
+      } else {
+        codeEl.className = 'language-python';
+      }
+      Prism.highlightElement(codeEl);
+    }
+
+    function selectDiffFile(idx) {
+      activeFileIndex = idx;
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      tabBtns.forEach((btn, i) => btn.classList.toggle('active', i === idx));
+
+      const fileObj = activeFiles[idx] || {};
+      const statusText = document.getElementById('diff-status-text');
+      if (fileObj.additions !== undefined || fileObj.deletions !== undefined) {
+        statusText.innerHTML = `<span style="color:#1a7f37; font-weight:600;">+${fileObj.additions || 0}</span> / <span style="color:#cf222e; font-weight:600;">-${fileObj.deletions || 0}</span> lines changed`;
+      }
+
+      if (currentDiffViewType === 'split') {
+        renderSplitDiffTable(fileObj);
+      } else {
+        renderUnifiedDiff(fileObj);
+      }
+    }
+
+    function renderUnifiedDiff(fileObj) {
+      document.getElementById('split-diff-view').style.display = 'none';
+      document.getElementById('unified-code-view').style.display = 'block';
+      const codeEl = document.getElementById('code-viewer');
+      codeEl.textContent = fileObj.diff || '# No diff content';
+      codeEl.className = 'language-diff';
+      Prism.highlightElement(codeEl);
+    }
+
+    function renderSplitDiffTable(fileObj) {
+      document.getElementById('split-diff-view').style.display = 'block';
+      document.getElementById('unified-code-view').style.display = 'none';
+
+      const baseProgId = document.getElementById('diff-base-select').value;
+      document.getElementById('split-header-left').innerText = `🔴 Base: Program ${baseProgId}`;
+      document.getElementById('split-header-right').innerText = `🟢 Candidate: Program ${currentDrawerProgId}`;
+
+      const tbody = document.getElementById('split-diff-tbody');
+      tbody.innerHTML = '';
+
+      const rows = fileObj.diff_rows || [];
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="padding:24px; text-align:center; color:#5f6368;"><em>${fileObj.diff || 'No differences between programs.'}</em></td></tr>`;
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        let rowClass = 'diff-row-equal';
+        if (r.left_type === 'delete' && r.right_type === 'insert') rowClass = 'diff-row-replace';
+        else if (r.left_type === 'delete') rowClass = 'diff-row-delete';
+        else if (r.right_type === 'insert') rowClass = 'diff-row-insert';
+        tr.className = rowClass;
+
+        // Left line num
+        const tdLeftNum = document.createElement('td');
+        tdLeftNum.className = `diff-num left-num ${r.left_type}`;
+        tdLeftNum.textContent = r.left_no !== null ? r.left_no : '';
+
+        // Left code
+        const tdLeftText = document.createElement('td');
+        tdLeftText.className = `diff-text left-text ${r.left_type === 'empty' ? 'empty-slot' : r.left_type}`;
+        tdLeftText.textContent = r.left_line !== '' ? r.left_line : (r.left_type === 'empty' ? '' : ' ');
+
+        // Right line num
+        const tdRightNum = document.createElement('td');
+        tdRightNum.className = `diff-num right-num ${r.right_type}`;
+        tdRightNum.textContent = r.right_no !== null ? r.right_no : '';
+
+        // Right code
+        const tdRightText = document.createElement('td');
+        tdRightText.className = `diff-text right-text ${r.right_type === 'empty' ? 'empty-slot' : r.right_type}`;
+        tdRightText.textContent = r.right_line !== '' ? r.right_line : (r.right_type === 'empty' ? '' : ' ');
+
+        tr.appendChild(tdLeftNum);
+        tr.appendChild(tdLeftText);
+        tr.appendChild(tdRightNum);
+        tr.appendChild(tdRightText);
+        fragment.appendChild(tr);
+      });
+
+      tbody.appendChild(fragment);
+    }
+
+    function copyActiveCode() {
+      const fileObj = activeFiles[activeFileIndex] || {};
+      const textToCopy = currentDrawerMode === 'diff' ? fileObj.diff : fileObj.content;
+      if (textToCopy) {
+        navigator.clipboard.writeText(textToCopy);
+        alert(currentDrawerMode === 'diff' ? 'Diff copied to clipboard!' : 'Source code copied to clipboard!');
+      }
+    }
+
+    // Drawer Resizing & Size Controls
+    let isDrawerMaximized = false;
+    let isWordWrap = true;
+
+    function setDrawerWidth(widthPx) {
+      const drawer = document.getElementById('drawer');
+      drawer.classList.remove('maximized');
+      isDrawerMaximized = false;
+      document.getElementById('btn-size-max').classList.remove('active');
+
+      const clampedWidth = Math.max(480, Math.min(window.innerWidth - 20, widthPx));
+      drawer.style.width = clampedWidth + 'px';
+      localStorage.setItem('ae_drawer_width', clampedWidth);
+
+      document.getElementById('btn-size-default').classList.toggle('active', clampedWidth === 760);
+      document.getElementById('btn-size-wide').classList.toggle('active', clampedWidth === 1050);
+    }
+
+    function toggleMaximizeDrawer() {
+      const drawer = document.getElementById('drawer');
+      isDrawerMaximized = !isDrawerMaximized;
+      drawer.classList.toggle('maximized', isDrawerMaximized);
+      document.getElementById('btn-size-max').classList.toggle('active', isDrawerMaximized);
+      document.getElementById('btn-size-default').classList.remove('active');
+      document.getElementById('btn-size-wide').classList.remove('active');
+
+      if (!isDrawerMaximized) {
+        const savedWidth = localStorage.getItem('ae_drawer_width') || 780;
+        drawer.style.width = savedWidth + 'px';
+      }
+    }
+
+    function toggleWordWrap() {
+      isWordWrap = !isWordWrap;
+      const pre = document.querySelector('.code-container pre');
+      if (pre) {
+        pre.classList.toggle('word-wrap', isWordWrap);
+      }
+      const splitTable = document.getElementById('split-diff-table');
+      const splitView = document.getElementById('split-diff-view');
+      if (splitTable) {
+        splitTable.classList.toggle('no-wrap', !isWordWrap);
+      }
+      if (splitView) {
+        splitView.classList.toggle('allow-scroll-x', !isWordWrap);
+      }
+      document.getElementById('btn-toggle-wrap').classList.toggle('active', isWordWrap);
+    }
+
+    function initDrawerResizer() {
+      const resizer = document.getElementById('drawer-resizer');
+      const drawer = document.getElementById('drawer');
+      if (!resizer || !drawer) return;
+
+      const savedWidth = localStorage.getItem('ae_drawer_width');
+      if (savedWidth) {
+        const parsed = parseInt(savedWidth, 10);
+        if (!isNaN(parsed) && parsed >= 480) {
+          drawer.style.width = Math.min(window.innerWidth - 20, parsed) + 'px';
+          document.getElementById('btn-size-default').classList.toggle('active', parsed === 760);
+          document.getElementById('btn-size-wide').classList.toggle('active', parsed === 1050);
+        }
+      }
+
+      let isDragging = false;
+
+      resizer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        resizer.classList.add('active');
+        drawer.classList.add('resizing');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        if (isDrawerMaximized) {
+          drawer.classList.remove('maximized');
+          isDrawerMaximized = false;
+          document.getElementById('btn-size-max').classList.remove('active');
+        }
+
+        const newWidth = window.innerWidth - e.clientX;
+        const clampedWidth = Math.max(480, Math.min(window.innerWidth - 20, newWidth));
+        drawer.style.width = clampedWidth + 'px';
+        document.getElementById('btn-size-default').classList.toggle('active', clampedWidth === 760);
+        document.getElementById('btn-size-wide').classList.toggle('active', clampedWidth === 1050);
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          resizer.classList.remove('active');
+          drawer.classList.remove('resizing');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          const currentWidth = parseInt(drawer.style.width, 10);
+          if (currentWidth) {
+            localStorage.setItem('ae_drawer_width', currentWidth);
+          }
+        }
+      });
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawer-overlay').style.display = 'none';
+      document.getElementById('drawer').classList.remove('open');
+    }
+
+    initDrawerResizer();
+    loadLineage();
+  </script>
+</body>
+</html>
