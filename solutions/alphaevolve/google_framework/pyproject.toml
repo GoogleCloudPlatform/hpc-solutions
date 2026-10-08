@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alpha-evolve"
+version = "0.1.0"
+description = "Core Evolutionary Engine and Python SDK for AlphaEvolve"
+requires-python = ">=3.10"
+dependencies = [
+    "google-api-core",
+    "google-auth",
+    "google-cloud-batch>=0.21.0",
+    "google-cloud-pubsub>=2.20.0",
+    "google-cloud-storage>=2.14.0",
+    "protobuf",
+    "pydantic>=2.0.0",
+    "requests",
+    "pyyaml",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
