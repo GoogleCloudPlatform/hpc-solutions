@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AlphaEvolve Live Progress Status</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; background: #f8f9fa; color: #212529; }
+    .container { max-width: 1050px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+    h1 { color: #1a73e8; margin-top: 0; font-size: 1.8em; }
+    .status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 0.9em; }
+    .status-running { background: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
+    .status-completed { background: #e8f0fe; color: #1a73e8; border: 1px solid #d2e3fc; }
+    .status-paused { background: #fef7e0; color: #b06000; border: 1px solid #feefc3; }
+    .pulse-dot { width: 10px; height: 10px; border-radius: 50%; background: #137333; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } 100% { opacity: 1; transform: scale(1); } }
+    
+    .card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 22px; margin-top: 20px; background: #ffffff; }
+    .card-title { font-size: 1.1em; font-weight: 600; color: #3c4043; margin-top: 0; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
+    .metric-box { background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; padding: 16px; text-align: center; }
+    .metric-value { font-size: 1.8em; font-weight: 700; color: #1a73e8; margin: 4px 0; }
+    .metric-label { font-size: 0.85em; color: #5f6368; font-weight: 500; }
+    
+    .progress-bar-container { background: #f1f3f4; border-radius: 8px; height: 22px; overflow: hidden; margin-top: 8px; position: relative; }
+    .progress-fill { height: 100%; transition: width 0.5s ease; background: linear-gradient(90deg, #4285f4, #34a853); }
+    .progress-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.82em; font-weight: 600; color: #212529; }
+    
+    .problem-box { background: #f8fbff; border-left: 4px solid #1a73e8; padding: 16px 20px; border-radius: 0 8px 8px 0; font-size: 0.95em; line-height: 1.5; color: #3c4043; white-space: pre-wrap; }
+    
+    .btn { display: inline-block; background: #1a73e8; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 500; margin-right: 10px; margin-top: 10px; }
+    .btn:hover { background: #1557b0; }
+    .btn-green { background: #188038; }
+    .btn-green:hover { background: #137333; }
+    .btn-secondary { background: #f1f3f4; color: #3c4043; border: 1px solid #dadce0; }
+    .btn-secondary:hover { background: #e8eaed; }
+    
+    .exp-switcher { background: #e8f0fe; padding: 14px 18px; border-radius: 8px; border: 1px solid #d2e3fc; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .chart-tab { background: transparent; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.82em; font-weight: 600; color: #5f6368; cursor: pointer; transition: all 0.2s ease; }
+    .chart-tab.active-tab { background: white; color: #1a73e8; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" style="color: #1a73e8; text-decoration: none; font-weight: 600;">&larr; Back to Dashboard Home</a>
+    
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-top: 12px;">
+      <h1 style="margin:0;"><span id="exp-title">Loading experiment status...</span></h1>
+      <div id="status-badge-container"></div>
+    </div>
+
+    <div class="exp-switcher" style="margin-top:16px;">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <label for="exp-selector" style="font-weight: 600; color: #1a73e8;">Switch Active Experiment:</label>
+        <select id="exp-selector" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #1a73e8; font-size: 0.95rem; min-width: 360px; background: white;"></select>
+      </div>
+      <label style="font-size: 0.88em; font-weight: 600; color: #3c4043; cursor: pointer;">
+        <input type="checkbox" id="auto-refresh-check" checked onchange="toggleAutoRefresh()"> 🔄 Live Auto-refresh (5s)
+      </label>
+    </div>
+
+    <div id="loading"><strong>🔍 Fetching live execution statistics from AlphaEvolve API...</strong></div>
+    
+    <div id="content" style="display: none;">
+      <!-- Execution Progression Bars -->
+      <div class="card">
+        <div class="card-title">📈 Candidate Evolution Progression</div>
+        
+        <div style="margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.9em; font-weight: 600;">
+            <span>Candidates Generated</span>
+            <span id="gen-prog-label">0 / 0 (0%)</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-fill" id="gen-prog-bar" style="width: 0%;"></div>
+            <div class="progress-text" id="gen-prog-text">0%</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.9em; font-weight: 600;">
+            <span>Candidates Evaluated</span>
+            <span id="eval-prog-label">0 / 0 (0%)</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-fill" id="eval-prog-bar" style="width: 0%; background: linear-gradient(90deg, #34a853, #188038);"></div>
+            <div class="progress-text" id="eval-prog-text">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Best Score Hero Card -->
+      <div class="card" style="background: linear-gradient(135deg, #fff8e1, #ffffff); border: 2px solid #f9ab00;">
+        <div class="card-title" style="color: #b06000;">
+          <span>🏆 Best Evaluated Candidate Score Achieved So Far</span>
+          <span id="best-score-badge" style="background:#f9ab00; color:white; padding:4px 10px; border-radius:14px; font-size:0.82em;">TOP CANDIDATE</span>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+          <div>
+            <div style="font-size: 2.4em; font-weight: 800; color: #e37400;" id="hero-best-score">N/A</div>
+            <div style="font-size: 0.9em; color: #5f6368;" id="hero-best-sub">No programs evaluated yet</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:600; font-size:0.95em;" id="hero-best-metrics"></div>
+            <a class="btn btn-green" id="btn-inspect-best" href="#" style="margin-top:8px; display:inline-block; font-size:0.88em;">🔍 View Best Program in Lineage Forest</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Metric Summary Grid -->
+      <div class="grid-4">
+        <div class="metric-box">
+          <div class="metric-label">TOTAL PROGRAMS CREATED</div>
+          <div class="metric-value" id="val-candidates">0</div>
+          <div class="metric-label" id="val-candidates-sub">Candidates in Forest</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">EVALUATED PROGRAMS</div>
+          <div class="metric-value" id="val-evaluated" style="color: #34a853;">0</div>
+          <div class="metric-label" id="val-pending-sub">0 Pending Queue</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">LLM INPUT TOKENS</div>
+          <div class="metric-value" id="val-in-tokens" style="font-size:1.5em; color:#5f6368;">0</div>
+          <div class="metric-label">Prompt &amp; Seed Context</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">LLM OUTPUT TOKENS</div>
+          <div class="metric-value" id="val-out-tokens" style="font-size:1.5em; color:#e37400;">0</div>
+          <div class="metric-label">Generated Code Volume</div>
+        </div>
+      </div>
+
+      <!-- Settings & Configuration Details -->
+      <div class="card">
+        <div class="card-title">⚙️ Experiment Execution &amp; Resource Configuration</div>
+        <table style="width:100%; border-collapse:collapse;">
+          <tbody>
+            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368; width:220px;">Target Program Language</td><td id="cfg-lang"><code>-</code></td></tr>
+            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">Max Program Budget</td><td id="cfg-max-prog"><code>-</code></td></tr>
+            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">Evaluation Concurrency</td><td id="cfg-concurrency"><code>-</code> parallel workers</td></tr>
+            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">Max Execution Time</td><td id="cfg-duration"><code>-</code></td></tr>
+            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">LLM Mutation Model</td><td id="cfg-model"><code>-</code></td></tr>
+            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">Experiment Creation Time</td><td id="cfg-create-time">-</td></tr>
+            <tr><td style="padding:10px; font-weight:600; color:#5f6368;">Full Resource ID</td><td id="cfg-resource-id" style="word-break:break-all;"><code>-</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Problem Description -->
+      <div class="card">
+        <div class="card-title">🎯 Problem Statement &amp; Multi-Objective Optimization Criteria</div>
+        <div class="problem-box" id="problem-desc-text"></div>
+      </div>
+
+      <!-- Fitness Progression Over Time Chart -->
+      <div class="card" style="margin-top:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+          <div>
+            <div class="card-title" style="margin-bottom:2px;">📈 Best Metric Score Progression Trajectory</div>
+            <div style="font-size:12px; color:#5f6368;">Track how mathematical candidate quality improved as mutations explored new code solutions.</div>
+          </div>
+          <div style="display:flex; gap:6px; background:#f1f3f4; padding:4px; border-radius:8px;">
+            <button id="mode-gen-btn" class="chart-tab active-tab" onclick="switchProgressionMode('gen')">🧬 By Evolution Generation Order</button>
+            <button id="mode-clock-btn" class="chart-tab" onclick="switchProgressionMode('clock')">⏱️ By Wall-Clock Completion Time</button>
+          </div>
+        </div>
+
+        <div id="chart-container" style="position:relative; width:100%; height:260px; background:#fafafa; border:1px solid #e0e0e0; border-radius:8px; padding:16px;">
+          <svg id="progression-svg" width="100%" height="100%" viewBox="0 0 800 220" preserveAspectRatio="none" style="overflow:visible;"></svg>
+          <div id="chart-tooltip" style="position:absolute; display:none; background:rgba(32,33,36,0.92); color:#fff; padding:8px 12px; border-radius:6px; font-size:12px; pointer-events:none; z-index:20; box-shadow:0 4px 12px rgba(0,0,0,0.25); white-space:nowrap;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px; color:#70757a;">
+          <span>Legend: <strong style="color:#1e8e3e;">&mdash;&mdash; Peak Score Achieved So Far</strong> &nbsp;|&nbsp; <span style="color:#1a73e8;">&bull; Individual Evaluated Candidate</span></span>
+          <span id="chart-info-text">Showing 0 evaluated steps</span>
+        </div>
+      </div>
+
+      <!-- Navigation CTAs -->
+      <div style="margin-top: 24px; display:flex; gap:12px; flex-wrap:wrap;">
+        <a class="btn btn-green" id="cta-lineage" href="#">🌳 Explore Evolutionary Lineage Forest &amp; Source Code</a>
+        <a class="btn btn-secondary" id="cta-json" href="#" target="_blank">📄 View Programmatic REST JSON (/api/status)</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentExp = null;
+    let refreshTimer = null;
+
+    function formatNumber(num) {
+      if (num === undefined || num === null) return '0';
+      const n = parseInt(num, 10);
+      return isNaN(n) ? num.toString() : n.toLocaleString();
+    }
+
+    async function initPage() {
+      const urlParams = new URLSearchParams(window.location.search);
+      currentExp = urlParams.get('exp');
+
+      const expsRes = await fetch('/api/experiments');
+      const expsData = await expsRes.json();
+      const exps = expsData.experiments || [];
+      const selector = document.getElementById('exp-selector');
+      selector.innerHTML = '';
+
+      if (exps.length === 0 && !currentExp) {
+        document.getElementById('loading').innerHTML = '<span style="color:red;">No experiments found.</span>';
+        return;
+      }
+
+      exps.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.name;
+        const t = (e.config && e.config.title) ? e.config.title : e.name.split('/').pop();
+        opt.textContent = `${t} (${e.state || 'UNSPECIFIED'}) - ${e.name.split('/').pop()}`;
+        selector.appendChild(opt);
+      });
+
+      if (!currentExp && exps.length > 0) {
+        currentExp = exps[0].name;
+      }
+      if (currentExp) {
+        selector.value = currentExp;
+      }
+
+      selector.onchange = function() {
+        window.location.search = '?exp=' + encodeURIComponent(this.value);
+      };
+
+      await fetchStatus();
+      toggleAutoRefresh();
+    }
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/status?exp=' + encodeURIComponent(currentExp));
+        const data = await res.json();
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+        const raw = data.raw_experiment || {};
+        const cfg = data.config || raw.config || {};
+        const stats = data.stats || raw.stats || {};
+        const runSettings = cfg.run_settings || cfg.runSettings || {};
+        const genSettings = cfg.generation_settings || cfg.generationSettings || {};
+        const models = genSettings.models || [];
+        const modelName = models.length > 0 ? models[0].name : 'default';
+
+        // Title & State Badge
+        const title = cfg.title || data.short_id || 'AlphaEvolve Experiment';
+        document.getElementById('exp-title').innerText = title;
+
+        const state = data.state || raw.state || 'UNKNOWN';
+        const badgeContainer = document.getElementById('status-badge-container');
+        if (state === 'RUNNING') {
+          badgeContainer.innerHTML = '<div class="status-badge status-running"><div class="pulse-dot"></div> RUNNING (LIVE MUTATION)</div>';
+        } else if (state === 'COMPLETED') {
+          badgeContainer.innerHTML = '<div class="status-badge status-completed">✔ COMPLETED</div>';
+        } else {
+          badgeContainer.innerHTML = `<div class="status-badge status-paused">⏸ ${state}</div>`;
+        }
+
+        // Progression Gauges
+        const candCount = stats.candidates_count !== undefined ? stats.candidates_count : (stats.candidatesCount || 0);
+        const evalCount = stats.evaluated_candidates_count !== undefined ? stats.evaluated_candidates_count : (stats.evaluatedCandidatesCount || 0);
+        const maxBudget = runSettings.maxPrograms || 100;
+
+        const genPct = maxBudget > 0 ? Math.min(100, Math.round((candCount / maxBudget) * 100)) : 100;
+        const evalPct = candCount > 0 ? Math.min(100, Math.round((evalCount / candCount) * 100)) : 100;
+
+        document.getElementById('gen-prog-label').innerText = `${formatNumber(candCount)} / ${formatNumber(maxBudget)} (${genPct}%)`;
+        document.getElementById('gen-prog-bar').style.width = `${genPct}%`;
+        document.getElementById('gen-prog-text').innerText = `${genPct}% Generated`;
+
+        document.getElementById('eval-prog-label').innerText = `${formatNumber(evalCount)} / ${formatNumber(candCount)} Evaluated (${evalPct}%)`;
+        document.getElementById('eval-prog-bar').style.width = `${evalPct}%`;
+        document.getElementById('eval-prog-text').innerText = `${evalPct}% Evaluated`;
+
+        // Metric Summary Cards
+        document.getElementById('val-candidates').innerText = formatNumber(candCount);
+        document.getElementById('val-evaluated').innerText = formatNumber(evalCount);
+        const pending = Math.max(0, candCount - evalCount);
+        document.getElementById('val-pending-sub').innerText = `${pending} Pending in Concurrency Queue`;
+
+        const rawStats = raw.stats || {};
+        const inTokens = stats.input_token_count || stats.inputTokenCount || rawStats.inputTokenCount || rawStats.input_token_count || 0;
+        const outTokens = stats.output_token_count || stats.outputTokenCount || rawStats.outputTokenCount || rawStats.output_token_count || 0;
+        document.getElementById('val-in-tokens').innerText = formatNumber(inTokens);
+        document.getElementById('val-out-tokens').innerText = formatNumber(outTokens);
+
+        // Best Candidate Score Hero Card
+        const bestScore = stats.best_score;
+        const mainMetric = stats.main_metric || 'score';
+        const bestProgId = stats.best_program_id;
+        const bestScoresMap = stats.best_scores_map || {};
+        const heroScoreEl = document.getElementById('hero-best-score');
+        const heroSubEl = document.getElementById('hero-best-sub');
+        const heroMetricsEl = document.getElementById('hero-best-metrics');
+        const inspectBestBtn = document.getElementById('btn-inspect-best');
+        const bestBadgeEl = document.getElementById('best-score-badge');
+
+        if (bestScore !== null && bestScore !== undefined) {
+          heroScoreEl.innerText = typeof bestScore === 'number' ? bestScore.toFixed(5) : bestScore;
+          heroSubEl.innerHTML = `Leader Candidate ID: <strong style="color:#1a73e8;">Prog ${bestProgId}</strong> &bull; Primary Metric: <code>${mainMetric}</code>`;
+          if (bestBadgeEl) bestBadgeEl.innerText = `MAIN METRIC: ${mainMetric.toUpperCase()}`;
+          
+          const metricsPairs = Object.entries(bestScoresMap).map(([k, v]) => `${k}: <code>${typeof v === 'number' ? v.toFixed(4) : v}</code>`);
+          heroMetricsEl.innerHTML = metricsPairs.join(' &bull; ');
+          inspectBestBtn.style.display = 'inline-block';
+          inspectBestBtn.href = `/lineage?exp=${encodeURIComponent(currentExp)}&prog=${encodeURIComponent(bestProgId)}`;
+        } else {
+          heroScoreEl.innerText = 'N/A';
+          heroSubEl.innerText = 'No candidate evaluation scores generated yet';
+          heroMetricsEl.innerHTML = '';
+          inspectBestBtn.style.display = 'none';
+        }
+
+        // Configuration Details
+        document.getElementById('cfg-lang').innerHTML = `<code>${cfg.program_language || cfg.programLanguage || 'python'}</code>`;
+        document.getElementById('cfg-max-prog').innerHTML = `<code>${formatNumber(maxBudget)} candidates</code>`;
+        document.getElementById('cfg-concurrency').innerHTML = `<code>${runSettings.concurrency || 4}</code>`;
+        document.getElementById('cfg-duration').innerHTML = `<code>${runSettings.maxDuration || '86400s'}</code>`;
+        document.getElementById('cfg-model').innerHTML = `<code>${modelName}</code>`;
+        document.getElementById('cfg-create-time').innerText = data.create_time || raw.createTime || '-';
+        document.getElementById('cfg-resource-id').innerHTML = `<code>${data.name || currentExp}</code>`;
+
+        // Problem Statement
+        document.getElementById('problem-desc-text').innerText = cfg.problem_description || cfg.problemDescription || 'No problem description provided.';
+
+        // CTA Links
+        document.getElementById('cta-lineage').href = '/lineage?exp=' + encodeURIComponent(currentExp);
+        document.getElementById('cta-json').href = '/api/status?exp=' + encodeURIComponent(currentExp);
+
+        // Render progression chart
+        renderProgressionChart(stats);
+
+      } catch (err) {
+        console.error('Error fetching status:', err);
+      }
+    }
+
+    let currentProgressionMode = 'gen';
+    let cachedStats = null;
+
+    function switchProgressionMode(mode) {
+      currentProgressionMode = mode;
+      document.getElementById('mode-gen-btn').classList.toggle('active-tab', mode === 'gen');
+      document.getElementById('mode-clock-btn').classList.toggle('active-tab', mode === 'clock');
+      if (cachedStats) renderProgressionChart(cachedStats);
+    }
+
+    function renderProgressionChart(stats) {
+      cachedStats = stats;
+      const series = currentProgressionMode === 'clock' ? (stats.progression_by_clock || []) : (stats.progression_by_gen || []);
+      const svg = document.getElementById('progression-svg');
+      const tooltip = document.getElementById('chart-tooltip');
+      const infoEl = document.getElementById('chart-info-text');
+      if (!svg) return;
+      svg.innerHTML = '';
+
+      if (!series || series.length === 0) {
+        infoEl.innerText = 'No evaluated score trajectory available yet';
+        return;
+      }
+
+      infoEl.innerText = `Showing ${series.length} evaluated candidate steps (${currentProgressionMode === 'clock' ? 'Wall-Clock Completion Order' : 'Evolution Generation Order'})`;
+
+      const width = 800;
+      const height = 220;
+      const padL = 50;
+      const padR = 20;
+      const padT = 20;
+      const padB = 30;
+      const plotW = width - padL - padR;
+      const plotH = height - padT - padB;
+
+      const rawScores = series.map(s => s.score);
+      const rawBests = series.map(s => s.best_so_far);
+      // Filter out non-physical simulation crash penalties (e.g. -1 trillion or extreme outliers) for Y-axis scale calculation
+      const validScores = rawScores.filter(v => v !== null && v !== undefined && v > -100000 && v < 1e9);
+      const validBests = rawBests.filter(v => v !== null && v !== undefined && v > -100000 && v < 1e9);
+      const scores = validScores.length > 0 ? validScores : rawScores;
+      const bests = validBests.length > 0 ? validBests : rawBests;
+      const minS = Math.min(...scores, ...bests);
+      const maxS = Math.max(...scores, ...bests);
+      const rawRange = (maxS - minS) || 0.1;
+      let yMin = minS - rawRange * 0.08;
+      let yMax = maxS + rawRange * 0.08;
+      if (minS >= 0 && yMin < 0) {
+        yMin = 0;
+      }
+      const yRange = (yMax - yMin) || 0.1;
+
+      // Real continuous time scaling for Wall-Clock mode
+      const epochTimes = series.map(s => s.timestamp ? new Date(s.timestamp).getTime() : 0);
+      const minT = Math.min(...epochTimes);
+      const maxT = Math.max(...epochTimes);
+      const spanT = (maxT - minT) || 1;
+
+      function xPos(pt, idx) {
+        if (currentProgressionMode === 'clock') {
+          if (spanT <= 0 || series.length <= 1) return padL + plotW / 2;
+          const t = pt.timestamp ? new Date(pt.timestamp).getTime() : minT;
+          return padL + ((t - minT) / spanT) * plotW;
+        }
+        if (series.length <= 1) return padL + plotW / 2;
+        return padL + (idx / (series.length - 1)) * plotW;
+      }
+      function yPos(val) {
+        const clamped = Math.max(yMin, Math.min(yMax, val));
+        return padT + plotH - ((clamped - yMin) / yRange) * plotH;
+      }
+
+      // Grid lines & Y-axis labels
+      let gridHtml = '';
+      const gridSteps = 4;
+      for (let i = 0; i <= gridSteps; i++) {
+        const v = yMin + yRange * (i / gridSteps);
+        const y = yPos(v);
+        gridHtml += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#e0e0e0" stroke-dasharray="3,3" />`;
+        gridHtml += `<text x="${padL - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="#70757a">${v.toFixed(3)}</text>`;
+      }
+
+      // X-axis ticks (Bottom axis: Elapsed Time or Sequence Step)
+      const xTickCount = 5;
+      for (let i = 0; i <= xTickCount; i++) {
+        const ratio = i / xTickCount;
+        const x = padL + ratio * plotW;
+        let lbl = '';
+        if (currentProgressionMode === 'clock') {
+          const totalSec = Math.max(0, Math.round((spanT * ratio) / 1000));
+          if (totalSec === 0) {
+            lbl = '+0s';
+          } else {
+            const hrs = Math.floor(totalSec / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            const secs = totalSec % 60;
+            if (hrs > 0) {
+              lbl = mins > 0 ? `+${hrs}h ${mins}m` : `+${hrs}h`;
+            } else if (mins > 0) {
+              lbl = secs > 0 ? `+${mins}m ${secs}s` : `+${mins}m`;
+            } else {
+              lbl = `+${secs}s`;
+            }
+          }
+        } else {
+          const stepIdx = Math.round(1 + ratio * (series.length - 1));
+          lbl = `#${stepIdx}`;
+        }
+        gridHtml += `<line x1="${x}" y1="${padT + plotH}" x2="${x}" y2="${padT + plotH + 5}" stroke="#70757a" />`;
+        gridHtml += `<text x="${x}" y="${padT + plotH + 18}" text-anchor="middle" font-size="10" fill="#70757a">${lbl}</text>`;
+      }
+      svg.innerHTML += gridHtml;
+
+      // Peak-best staircase polyline
+      const stepPoints = [];
+      series.forEach((pt, i) => {
+        const x = xPos(pt, i);
+        const y = yPos(pt.best_so_far);
+        if (i === 0) {
+          stepPoints.push(`${x},${y}`);
+        } else {
+          stepPoints.push(`${x},${yPos(series[i - 1].best_so_far)}`);
+          stepPoints.push(`${x},${y}`);
+        }
+      });
+      svg.innerHTML += `<polyline fill="none" stroke="#1e8e3e" stroke-width="2.8" points="${stepPoints.join(' ')}" />`;
+
+      // Semi-transparent area fill under green curve
+      if (series.length > 0) {
+        const firstX = xPos(series[0], 0);
+        const lastX = xPos(series[series.length - 1], series.length - 1);
+        const bottomY = padT + plotH;
+        const areaPoints = `${firstX},${bottomY} ${stepPoints.join(' ')} ${lastX},${bottomY}`;
+        svg.innerHTML += `<polygon fill="rgba(52, 168, 83, 0.10)" points="${areaPoints}" />`;
+      }
+
+      // Candidate points (circles)
+      series.forEach((pt, i) => {
+        const cx = xPos(pt, i);
+        const cy = yPos(pt.score);
+        const isPeak = pt.is_new_best;
+        const isPenalty = pt.score < -100000;
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", cx);
+        circle.setAttribute("cy", cy);
+        circle.setAttribute("r", isPeak ? "5.5" : "3.5");
+        circle.setAttribute("fill", isPeak ? "#f9ab00" : (isPenalty ? "#ea4335" : "#1a73e8"));
+        circle.setAttribute("stroke", "#ffffff");
+        circle.setAttribute("stroke-width", "1.5");
+        circle.style.cursor = "pointer";
+
+        circle.onmouseover = function(evt) {
+          tooltip.style.display = 'block';
+          const rect = document.getElementById('chart-container').getBoundingClientRect();
+          tooltip.style.left = (evt.clientX - rect.left + 12) + 'px';
+          tooltip.style.top = (evt.clientY - rect.top - 10) + 'px';
+          const timeStr = pt.timestamp ? (pt.timestamp.split('T')[1] || '').split('.')[0] : '';
+          const scoreDisp = isPenalty ? pt.score.toExponential(2) : pt.score.toFixed(5);
+          tooltip.innerHTML = `<strong>Step #${pt.seq} &bull; Prog ${pt.id}</strong>${isPeak ? ' 🏆 NEW RECORD' : (isPenalty ? ' ⚠️ CRASH PENALTY' : '')}<br>Candidate Score: <code>${scoreDisp}</code> &nbsp;|&nbsp; Peak Best: <code>${pt.best_so_far.toFixed(5)}</code><br><span style="color:#bdc1c6;">Time: ${timeStr}</span>`;
+        };
+        circle.onmouseout = function() {
+          tooltip.style.display = 'none';
+        };
+        circle.onclick = function() {
+          window.location.href = `/lineage?exp=${encodeURIComponent(currentExp)}&prog=${encodeURIComponent(pt.id)}`;
+        };
+        svg.appendChild(circle);
+      });
+    }
+
+    function toggleAutoRefresh() {
+      const check = document.getElementById('auto-refresh-check');
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+      if (check.checked) {
+        refreshTimer = setInterval(fetchStatus, 5000);
+      }
+    }
+
+    initPage();
+  </script>
+</body>
+</html>

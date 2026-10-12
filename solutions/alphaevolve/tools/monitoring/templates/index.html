@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AlphaEvolve Cloud Run Web Monitor</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; background: #f8f9fa; color: #212529; }
+    .container { max-width: 960px; margin: 0 auto; background: white; padding: 36px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+    h1 { color: #1a73e8; margin-top: 0; }
+    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 22px; margin-top: 22px; }
+    .btn { display: inline-block; background: #1a73e8; color: white; padding: 8px 14px; text-decoration: none; border-radius: 6px; font-weight: 500; margin-right: 8px; margin-top: 8px; font-size: 0.95em; }
+    .btn:hover { background: #1557b0; }
+    .btn-green { background: #188038; }
+    .btn-green:hover { background: #137333; }
+    code { background: #f1f3f4; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    .exp-item { border: 1px solid #d2e3fc; background: #f8fbff; border-radius: 8px; padding: 18px; margin-top: 14px; }
+    .exp-title { font-size: 1.25em; font-weight: 600; color: #1a73e8; margin: 0 0 6px 0; }
+    .exp-meta { font-size: 0.88em; color: #5f6368; margin: 4px 0 10px 0; word-break: break-all; }
+    .badge { background: #e6f4ea; color: #137333; padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600; display: inline-block; margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 AlphaEvolve Cloud Run Web Service</h1>
+    <p>Welcome to the serverless AlphaEvolve monitoring dashboard and interactive evolutionary lineage visualizer.</p>
+    
+    <div class="card">
+      <h3>System &amp; Discovery API</h3>
+      <a class="btn" href="/health">Service Health (/health)</a>
+      <a class="btn" href="/api/experiments">Raw JSON Experiments List (/api/experiments)</a>
+    </div>
+
+    <div class="card">
+      <h3>🧪 Active Discovery Experiments Directory</h3>
+      <p>Discovered real-time candidate evolution experiments across accessible sessions:</p>
+      <div id="loading"><strong>🔍 Discovering active AlphaEvolve experiments from Discovery Engine API...</strong></div>
+      <div id="experiments-list"></div>
+    </div>
+
+    <div class="card">
+      <h3>REST API Documentation</h3>
+      <ul>
+        <li><code>GET /health</code> - Returns service operational status</li>
+        <li><code>GET /api/experiments</code> - Lists AlphaEvolve experiments in GCP project across all sessions</li>
+        <li><code>GET /api/status?exp=&lt;EXPERIMENT_ID&gt;</code> - Returns live progression statistics &amp; candidate evaluation counts</li>
+        <li><code>GET /lineage?exp=&lt;EXPERIMENT_ID&gt;</code> - Interactive Evolutionary Forest Graph Visualizer (Child/Parent/Sibling relationships &amp; Code Inspector)</li>
+        <li><code>GET /api/lineage?exp=&lt;EXPERIMENT_ID&gt;</code> - JSON ancestry tree &amp; per-node metadata</li>
+        <li><code>GET /api/program_code?exp=&lt;EXPERIMENT_ID&gt;&amp;prog=&lt;PROGRAM_ID&gt;</code> - Returns program details and source code files</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    async function loadExperiments() {
+      try {
+        const res = await fetch('/api/experiments');
+        const data = await res.json();
+        const container = document.getElementById('experiments-list');
+        document.getElementById('loading').style.display = 'none';
+
+        const exps = data.experiments || [];
+        if (exps.length === 0) {
+          container.innerHTML = '<p><em>No active experiments found in the current project or engine.</em></p>';
+          return;
+        }
+
+        exps.forEach(exp => {
+          const title = (exp.config && exp.config.title) ? exp.config.title : exp.name.split('/').pop();
+          const lang = (exp.config && exp.config.programLanguage) ? exp.config.programLanguage : 'unknown';
+          const state = exp.state || 'UNSPECIFIED';
+          const expId = exp.name;
+
+          const div = document.createElement('div');
+          div.className = 'exp-item';
+          div.innerHTML = `
+            <div class="exp-title">${title}</div>
+            <div>
+              <span class="badge">State: ${state}</span>
+              <span class="badge" style="background:#f1f3f4;color:#3c4043;">Lang: ${lang}</span>
+            </div>
+            <div class="exp-meta">ID: <code>${expId}</code></div>
+            <div>
+              <a class="btn" href="/status?exp=${encodeURIComponent(expId)}">📊 Live Progress Status</a>
+              <a class="btn btn-green" href="/lineage?exp=${encodeURIComponent(expId)}">🌳 View Lineage Forest</a>
+              <a href="/api/status?exp=${encodeURIComponent(expId)}" target="_blank" style="font-size:0.8em;color:#5f6368;margin-left:6px;">[JSON]</a>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      } catch (err) {
+        document.getElementById('loading').innerHTML = '<span style="color: red;">Error discovering experiments: ' + err.message + '</span>';
+      }
+    }
+    loadExperiments();
+  </script>
+</body>
+</html>
