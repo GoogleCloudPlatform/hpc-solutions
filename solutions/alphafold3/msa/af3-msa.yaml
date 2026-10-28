@@ -1,0 +1,248 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+
+# Prereq: service usage API, secret manager API
+
+blueprint_name: af3-msa
+
+vars:
+  project_id:  ## Set GCP project ID here ##
+  deployment_name: af3-msa
+  region: europe-west4
+  af3_version: main
+  source_database_url: "https://storage.googleapis.com/alphafold-databases/v3.0"
+  msa_task_count: 300
+  msa_parallelism: 50
+  msa_disk_size_gb: 600
+  submit_msa_job: false
+  db_prep_spot: false
+  msa_spot: true
+
+deployment_groups:
+- group: setup
+  modules:
+  - id: service-apis
+    source: community/modules/project/service-enablement
+    settings:
+      gcp_service_list: [
+      "artifactregistry.googleapis.com",
+      "batch.googleapis.com",
+      "cloudbuild.googleapis.com",
+      "compute.googleapis.com",
+      "storage.googleapis.com",
+      "secretmanager.googleapis.com",
+    ]
+
+  - id: network
+    source: modules/network/vpc
+
+  - id: artifact-repository
+    source: community/modules/container/artifact-registry
+    settings:
+      repo_mode: STANDARD_REPOSITORY
+      format: DOCKER
+
+  - id: build-alphafold3
+    source: community/modules/container/cloud-build
+    settings:
+      repo_url: "https://github.com/google-deepmind/alphafold3.git"
+      repo_ref: $(vars.af3_version)
+      cloud_build_template_path: $(ghpc_stage("./build-alphafold3.yaml.tfpl"))
+      skip_if_exists:
+        - "$(artifact-repository.repo_url)/alphafold3:$(vars.af3_version)"
+      template_vars:
+        _DEST_REPO_URL: $(artifact-repository.repo_url)
+
+  - id: alphafold-bucket
+    source: modules/file-system/cloud-storage-bucket
+    settings:
+      name_prefix: alphafold-msa
+      random_suffix: true
+      use_deployment_name_in_bucket_name: false
+      storage_class: STANDARD
+      soft_delete_retention_duration: 0
+      public_access_prevention: enforced
+      force_destroy: true
+    outputs:
+      - gcs_bucket_path
+
+- group: batch
+  modules:
+  # TODO(jacobwarwick): REMOVE - With Cluster Toolkit 1.108.0+, replace this setup_hyperdisk
+  # dynamic boost workaround by configuring custom disk_provisioned_iops and
+  # disk_provisioned_throughput directly in the compute template module.
+  - id: batch-startup-script
+    source: modules/scripts/startup-script
+    settings:
+      gcs_bucket_path: $(alphafold-bucket.gcs_bucket_path)/startup-scripts/setup-hyperdisk
+      runners:
+        - type: shell
+          destination: /tmp/setup-hyperdisk.sh
+          source: $(ghpc_stage("src/setup_hyperdisk.sh"))
+          args: $(vars.region)
+
+  # TODO(jacobwarwick): REMOVE - With Cluster Toolkit 1.108.0+, configure disk_provisioned_iops: 50000
+  # and disk_provisioned_throughput: 2400 directly on the template settings once PR #6387 is released.
+  - id: batch-compute-template
+    source: github.com/terraform-google-modules/terraform-google-vm//modules/instance_template?ref=v12.1.0
+    settings:
+      name_prefix: af3-msa-hdb
+      machine_type: c4d-standard-96
+      spot: $(vars.msa_spot)
+      source_image_family: batch-debian-12-official
+      source_image_project: batch-custom-image
+      disk_type: hyperdisk-balanced
+      disk_size_gb: $(vars.msa_disk_size_gb)
+      subnetwork: $(network.subnetwork_self_link)
+      service_account:
+        email: null
+        scopes: ["https://www.googleapis.com/auth/cloud-platform"]
+      access_config:
+        - nat_ip: null
+          network_tier: null
+      total_egress_bandwidth_tier: "TIER_1"
+      startup_script: $(batch-startup-script.startup_script)
+      metadata:
+        gcs_bucket_path: $(alphafold-bucket.gcs_bucket_path)
+        msa_parallelism: $(vars.msa_parallelism)
+
+  - id: db-prep-compute-template
+    source: github.com/terraform-google-modules/terraform-google-vm//modules/instance_template?ref=v12.1.0
+    settings:
+      name_prefix: af3-db-prep-hdb
+      machine_type: c4d-standard-96
+      spot: $(vars.db_prep_spot)
+      source_image_family: batch-debian-12-official
+      source_image_project: batch-custom-image
+      disk_type: hyperdisk-balanced
+      disk_size_gb: 1500
+      subnetwork: $(network.subnetwork_self_link)
+      service_account:
+        email: null
+        scopes: ["https://www.googleapis.com/auth/cloud-platform"]
+      access_config:
+        - nat_ip: null
+          network_tier: null
+      total_egress_bandwidth_tier: "TIER_1"
+      startup_script: $(batch-startup-script.startup_script)
+      metadata:
+        gcs_bucket_path: $(alphafold-bucket.gcs_bucket_path)
+        source_database_url: $(vars.source_database_url)
+
+  - id: db-prep-job
+    source: ../../../community/local_modules/scheduler/batch-job-template
+    settings:
+      instance_template: $(db-prep-compute-template.self_link)
+      startup_script_path: $(alphafold-bucket.gcs_bucket_path)/startup-scripts/db-prep-job
+      submit: false
+      runnables:
+        - script: $(file(ghpc_stage("src/db_prep.sh")))
+
+  - id: msa-array-job
+    source: ../../../community/local_modules/scheduler/batch-job-template
+    settings:
+      instance_template: $(batch-compute-template.self_link)
+      task_count: $(vars.msa_task_count)
+      parallelism: $(vars.msa_parallelism)
+      task_count_per_node: 1
+      max_retry_count: 10
+      startup_script_path: $(alphafold-bucket.gcs_bucket_path)/startup-scripts/msa-array-job
+      lifecycle_policies:
+        - action: RETRY_TASK
+          exit_codes: [50001, 50002, 50003, 50004, 50006]
+      submit: $(vars.submit_msa_job)
+      runnables:
+        # 1. Sync databases to Hyperdisk Balanced and mount PDB mmCIF SquashFS (only if not already downloaded)
+        - script: $(file(ghpc_stage("src/download_msa_dbs.sh")))
+
+        # 2. Run AlphaFold 3 MSA data pipeline with unsharded DBs on Hyperdisk Balanced and mounted PDB mmCIF SquashFS
+        - script: |
+            #!/bin/bash
+            set -euo pipefail
+            exec 2>&1
+            export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+
+            TASK_INDEX="$BATCH_TASK_INDEX"
+            if [ -z "$TASK_INDEX" ]; then
+              TASK_INDEX=0
+            fi
+            echo "=== Starting AlphaFold 3 MSA Task $TASK_INDEX ==="
+
+            LOCAL_DB_DIR="/mnt/disks/hyperdisk/databases"
+            LOCAL_MMCIF_DIR="/mnt/disks/hyperdisk/pdb_mmcif"
+            INPUT_GCS_PATH="$(alphafold-bucket.gcs_bucket_path)/msa-inputs/$TASK_INDEX.json"
+            OUTPUT_GCS_DIR="$(alphafold-bucket.gcs_bucket_path)/msa-outputs"
+
+            echo "=== Running AlphaFold 3 MSA data pipeline ==="
+            echo "Input JSON (GCS): $INPUT_GCS_PATH"
+            echo "Output Directory (GCS): $OUTPUT_GCS_DIR"
+            echo "PDB mmCIF Directory (SquashFS Mount): $LOCAL_MMCIF_DIR"
+
+            if command -v docker-credential-gcr >/dev/null 2>&1; then
+              docker-credential-gcr configure-docker --registries="$(vars.region)-docker.pkg.dev"
+            fi
+
+            docker run --rm \
+              -v /mnt/disks/hyperdisk:/mnt/disks/hyperdisk \
+              -v "$LOCAL_MMCIF_DIR:$LOCAL_MMCIF_DIR:ro" \
+              "$(artifact-repository.repo_url)/alphafold3:$(vars.af3_version)" \
+              python run_alphafold.py \
+              --json_path="$INPUT_GCS_PATH" \
+              --output_dir="$OUTPUT_GCS_DIR" \
+              --force_output_dir=true \
+              --run_inference=false \
+              --run_data_pipeline=true \
+              --small_bfd_database_path="$LOCAL_DB_DIR/bfd-first_non_consensus_sequences.fasta" \
+              --small_bfd_z_value=65984053 \
+              --uniref90_database_path="$LOCAL_DB_DIR/uniref90_2022_05.fa" \
+              --uniref90_z_value=153742194 \
+              --uniprot_cluster_annot_database_path="$LOCAL_DB_DIR/uniprot_all_2021_04.fa" \
+              --uniprot_cluster_annot_z_value=225619586 \
+              --mgnify_database_path="$LOCAL_DB_DIR/mgy_clusters_2022_05.fa" \
+              --mgnify_z_value=623796864 \
+              --rfam_database_path="$LOCAL_DB_DIR/rfam_14_9_clust_seq_id_90_cov_80_rep_seq.fasta@16" \
+              --rfam_z_value=138.115553 \
+              --rna_central_database_path="$LOCAL_DB_DIR/rnacentral_active_seq_id_90_cov_80_linclust.fasta@64" \
+              --rna_central_z_value=13271.415730 \
+              --ntrna_database_path="$LOCAL_DB_DIR/nt_rna_2023_02_23_clust_seq_id_90_cov_80_rep_seq.fasta@384" \
+              --ntrna_z_value=76752.808514 \
+              --seqres_database_path="$LOCAL_DB_DIR/pdb_seqres_2022_09_28.fasta" \
+              --pdb_database_path="$LOCAL_MMCIF_DIR" \
+              --jackhmmer_n_cpu=32 \
+              --nhmmer_n_cpu=1 \
+              --nhmmer_max_parallel_shards=24 \
+              --hmmsearch_n_cpu=32
+
+            echo "=== AlphaFold 3 MSA task $TASK_INDEX completed successfully ==="
+
+  - id: msa-instructions
+    source: ../../../community/modules/general/instructions
+    settings:
+      banner_title: "AlphaFold 3 MSA Next Steps"
+      template_path: $(ghpc_stage("./instructions.txt.tftpl"))
+      template_vars:
+        project_id: $(vars.project_id)
+        region: $(vars.region)
+        deployment_name: $(vars.deployment_name)
+        bucket_path: $(alphafold-bucket.gcs_bucket_path)
+        msa_task_count: $(vars.msa_task_count)
+        msa_parallelism: $(vars.msa_parallelism)
+        db_prep_job_data: $(db-prep-job.job_data)
+        msa_job_data: $(msa-array-job.job_data)
+      write_to_file: NEXT_STEPS.txt
+      print_to_terminal: false
+    outputs:
+      - instructions

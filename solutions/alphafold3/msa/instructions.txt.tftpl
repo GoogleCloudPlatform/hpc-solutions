@@ -1,0 +1,63 @@
+Deployment Summary
+  Project / Region : ${project_id} (${region})
+  Storage Bucket   : ${bucket_path}
+  Batch Scripts    : ./${deployment_name}/batch/
+  MSA Array Sizing : ${msa_task_count} tasks (up to ${msa_parallelism} concurrent VMs)
+
+--------------------------------------------------------------------
+Step 1: Prepare Reference Databases (Run Once per Deployment)
+--------------------------------------------------------------------
+Submit the one-time database preparation job to download, shard, and
+package the AlphaFold 3 reference databases (~407 GB FASTA + ~60 GB
+PDB mmCIF SquashFS) into ${bucket_path}:
+
+  (cd ${deployment_name}/batch && ./submit-db-prep-job.sh)
+
+This job runs asynchronously on Cloud Batch (~12 minutes). You can
+proceed immediately to Step 2 to upload your inputs while it runs.
+
+Monitor database preparation status:
+  gcloud batch jobs describe ${db_prep_job_data.id} --location=${region} --project=${project_id} --format="value(status.state)"
+  https://console.cloud.google.com/batch/jobsDetail/regions/${region}/jobs/${db_prep_job_data.id}?project=${project_id}
+
+--------------------------------------------------------------------
+Step 2: Upload MSA Target Inputs
+--------------------------------------------------------------------
+Task i of the Cloud Batch array job reads ${bucket_path}/msa-inputs/<i>.json,
+where files are named as 0-indexed sequential integers:
+  0.json, 1.json, ..., ${msa_task_count - 1}.json
+
+Ensure msa_task_count (currently ${msa_task_count}) matches your total target count.
+
+Option A - Upload individual AlphaFold 3 input JSON files:
+  gcloud storage cp /path/to/targets/*.json ${bucket_path}/msa-inputs/
+
+Option B - Expand and upload a JSONL file (e.g., the 13 bundled demo targets):
+  d=$(mktemp -d) && awk -v d="$d" '{f=d"/"(NR-1)".json"; print > f; close(f)}' example-targets.jsonl && gcloud storage cp "$d"/*.json ${bucket_path}/msa-inputs/ && rm -rf "$d"
+
+  Note: If running the 13 bundled demo targets in example-targets.jsonl,
+  redeploy with '--vars msa_task_count=13' before submitting Step 3.
+
+--------------------------------------------------------------------
+Step 3: Submit the MSA Array Job
+--------------------------------------------------------------------
+Once Step 1 (${db_prep_job_data.id}) reaches SUCCEEDED and your inputs
+are uploaded to ${bucket_path}/msa-inputs/, submit the alignment job:
+
+  (cd ${deployment_name}/batch && ./submit-msa-array-job.sh)
+
+Monitor MSA array job progress:
+  gcloud batch jobs describe ${msa_job_data.id} --location=${region} --project=${project_id} --format="yaml(status.state,status.taskGroups.group0.counts)"
+  https://console.cloud.google.com/batch/jobsDetail/regions/${region}/jobs/${msa_job_data.id}?project=${project_id}
+
+  Note: Cloud Batch job IDs are single-use. To submit a subsequent run,
+  re-run 'gcluster deploy' to generate a fresh job ID and submit script.
+
+--------------------------------------------------------------------
+Step 4: Retrieve Alignment Outputs
+--------------------------------------------------------------------
+Completed alignments (populated with MSAs and structural templates) are
+written directly to ${bucket_path}/msa-outputs/<target_name>/:
+
+  gcloud storage ls ${bucket_path}/msa-outputs/
+  gcloud storage cp -r "${bucket_path}/msa-outputs/*" /path/to/local/outputs/
