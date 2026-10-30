@@ -56,7 +56,8 @@ deployment_groups:
       format: DOCKER
 
   - id: build-alphafold3
-    source: community/modules/container/cloud-build
+    source: github.com/GoogleCloudPlatform/cluster-toolkit//community/modules/container/cloud-build?ref=version%2Fv1.108.0&depth=1
+    # TODO(jacobwarwick): replace with community/modules/container/cloud-build in CTK v1.108.0
     settings:
       repo_url: "https://github.com/google-deepmind/alphafold3.git"
       repo_ref: $(vars.af3_version)
