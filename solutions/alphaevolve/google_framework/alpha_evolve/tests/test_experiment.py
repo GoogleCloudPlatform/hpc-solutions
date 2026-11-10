@@ -89,6 +89,18 @@ def test_parse_models_from_env():
     parsed_single = parse_models_from_env("GEMINI_V3P8_FLASH")
     assert parsed_single == [{"name": AlphaEvolveModel.GEMINI_V3P8_FLASH}]
 
+    parsed_argon_enum = parse_models_from_env("GEMINI_V4_ARGON")
+    assert parsed_argon_enum == [{"name": AlphaEvolveModel.GEMINI_V4_ARGON}]
+    assert parsed_argon_enum[0]["name"] == "gemini-4-argon"
+
+    parsed_argon_str = parse_models_from_env("gemini-4-argon")
+    assert parsed_argon_str == [{"name": AlphaEvolveModel.GEMINI_V4_ARGON}]
+
+    argon_cfg = AlphaEvolveModelConfig(name=AlphaEvolveModel.GEMINI_V4_ARGON)
+    assert argon_cfg.name == "gemini-4-argon"
+    argon_enum_cfg = AlphaEvolveModelConfig(name="GEMINI_V4_ARGON")
+    assert argon_enum_cfg.name == "gemini-4-argon"
+
     parsed_mixture = parse_models_from_env("GEMINI_V3P8_FLASH:0.7, GEMINI_V3P5_FLASH:0.3")
     assert parsed_mixture == [
         {"name": AlphaEvolveModel.GEMINI_V3P8_FLASH, "weight": 0.7},

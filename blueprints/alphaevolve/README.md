@@ -42,8 +42,12 @@ Ensure you have:
 - **Google Cloud SDK** installed:
   - If not installed, follow the [Google Cloud SDK Installation Guide](https://cloud.google.com/sdk/docs/install).
   - For standard Linux distributions (like Debian/Ubuntu), you can use: `sudo apt-get install google-cloud-cli`.
-- **Cluster Toolkit (`gcluster`)** installed:
-  - For detailed instructions, see the [Cluster Toolkit Documentation](https://docs.cloud.google.com/cluster-toolkit/docs/setup/configure-environment).
+- **Cluster Toolkit (`gcluster`) v1.108.0 or later** installed:
+  - For installation or upgrade instructions, see the [Cluster Toolkit Documentation](https://docs.cloud.google.com/cluster-toolkit/docs/setup/configure-environment).
+  - Verify your installed version with:
+    ```bash
+    gcluster --version
+    ```
   - **Note**: To run `gcluster` from any directory, add the directory containing the `gcluster` binary to your `PATH`. For example:
     ```bash
     export PATH=$PATH:/path/to/cluster-toolkit
@@ -158,7 +162,7 @@ When deploying your own custom experiment developed locally on your build machin
    - group: experiment-setup
      modules:
      - id: stage-experiment-source
-       source: ../../community/modules/file-system/gcs-objects
+       source: community/modules/file-system/gcs-objects
        settings:
          bucket_name: $(vars.existing_bucket_name)
          directories:

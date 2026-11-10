@@ -2,7 +2,7 @@
 
 AlphaEvolve is an agentic capability created by Google that leverages Large Language Models (LLMs like Gemini) to programmatically discover and optimize code. By wrapping targeted functions or classes in your code, AlphaEvolve discovers faster, more accurate, or more resource-efficient implementations through an evolutionary loop.
 
-The **AlphaEvolve Solution** provides the Python framework, execution engine, evaluation pipelines, CLI tools, and problem examples for running scalable evolutionary optimization. Cloud infrastructure deployment is managed declaratively via Cluster Toolkit blueprints located in [`blueprints/alphaevolve`](../../blueprints/alphaevolve). The solution uses the AlphaEvolve API of Gemini Enterprise (see [Supported Models](https://docs.cloud.google.com/gemini/enterprise/docs/alphaevolve/reference-guide/api-reference#supported_models)).
+The **AlphaEvolve Solution** provides the Python framework, execution engine, evaluation pipelines, CLI tools, and problem examples for running scalable evolutionary optimization. Cloud infrastructure deployment is managed declaratively via Cluster Toolkit blueprints located in [`blueprints/alphaevolve`](../../blueprints/alphaevolve). The solution uses the AlphaEvolve API of Gemini Enterprise (see [Supported Models](https://docs.cloud.google.com/gemini/enterprise/docs/alphaevolve/reference-guide/api-reference#supported-models)).
 
 ---
 
@@ -67,7 +67,7 @@ We prepackaged a set of examples to get you started. For an overview of the prov
 
 ## Infrastructure & Deployment
 
-Infrastructure provisioning for AlphaEvolve on Google Cloud is managed using [Cluster Toolkit (`gcluster`)](https://docs.cloud.google.com/cluster-toolkit/docs/setup/configure-environment).
+Infrastructure provisioning for AlphaEvolve on Google Cloud is managed using [Cluster Toolkit (`gcluster`)](https://docs.cloud.google.com/cluster-toolkit/docs/setup/configure-environment) (**v1.108.0 or later**).
 
 For complete step-by-step instructions on deploying the base infrastructure (APIs, GCS bucket, Pub/Sub, Artifact Registry, Vertex AI Colab Enterprise runtime) and building problem container images, please refer to the **[AlphaEvolve Blueprints README](../../blueprints/alphaevolve/README.md)**.
 ## Running Experiments

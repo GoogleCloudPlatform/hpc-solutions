@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Requires Cluster Toolkit (gcluster) v1.108.0 or later.
 blueprint_name: alpha-evolve-platform
 
 vars:
@@ -31,7 +32,7 @@ vars:
 
   # === AlphaEvolve API Config ===
   concurrency: 4 # number of concurrent candidates to AlphaEvolve will generate at one time.
-  # See supported models: https://docs.cloud.google.com/gemini/enterprise/docs/alphaevolve/reference-guide/api-reference#supported_models
+  # See supported models: https://docs.cloud.google.com/gemini/enterprise/docs/alphaevolve/reference-guide/api-reference#supported-models
   model: gemini-3.8-flash
   max_programs_generated: 100 # max number of programs AE API will generate in total
   max_duration: 6 # Absolute maximum wall-clock lifespan of the experiment run in hours (valid range: 1 to 24)
@@ -142,7 +143,7 @@ deployment_groups:
 - group: cloud-build
   modules:
   - id: cloud-build
-    source: ../../community/modules/container/cloud-build
+    source: community/modules/container/cloud-build
     settings:
       project_id: $(vars.project_id)
       region: $(vars.region)
@@ -165,7 +166,7 @@ deployment_groups:
 - group: pubsub-subscription
   modules:
   - id: project-info
-    source: ../../community/modules/project/pre-existing-project
+    source: community/modules/project/pre-existing-project
     settings:
       project_id: $(vars.project_id)
   - id: experiment-subscription
@@ -196,7 +197,7 @@ deployment_groups:
   modules:
   # Option A (Default): Sync experiment source from AE remote Git repository
   - id: stage-experiment-source
-    source: ../../community/modules/file-system/gcs-sync
+    source: community/modules/file-system/gcs-sync
     settings:
       bucket_name: $(vars.existing_bucket_name)
       repo_url: $(vars.repo_url)
@@ -207,21 +208,21 @@ deployment_groups:
   # Option B: Upload experiment source from a local directory on your machine
   # (Uncomment this block and comment out Option A above)
   #- id: stage-experiment-source
-  #  source: ../../community/modules/file-system/gcs-objects
+  #  source: community/modules/file-system/gcs-objects
   #  settings:
   #    bucket_name: $(vars.existing_bucket_name)
   #    directories:
   #      - source_path: "$(vars.example_dir)"
   #        destination_path: $(vars.user_experiment_name)/source
   - id: experiment-metadata
-    source: ../../community/modules/project/project-metadata
+    source: community/modules/project/project-metadata
     settings:
       project_id: $(vars.project_id)
       metadata:
         - key: "$(vars.user_experiment_name)_USER_EXPERIMENT_NAME"
           value: $(vars.user_experiment_name)
   - id: experiment-env-file
-    source: ../../community/modules/file-system/gcs-objects
+    source: community/modules/file-system/gcs-objects
     settings:
       bucket_name: $(vars.existing_bucket_name)
       files:
