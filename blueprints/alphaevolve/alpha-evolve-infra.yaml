@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Requires Cluster Toolkit (gcluster) v1.108.0 or later.
 blueprint_name: alpha-evolve-platform
 
 vars:
@@ -89,7 +90,7 @@ deployment_groups:
 
   # Create Cloud Batch Service Agent identity
   - id: create-batch-identity
-    source: ../../community/modules/project/service-agent
+    source: community/modules/project/service-agent
     settings:
       project_id: $(vars.project_id)
       service: batch.googleapis.com
@@ -164,7 +165,7 @@ deployment_groups:
 - group: alpha-evolve-infra
   modules:
   - id: discovery-engine
-    source: ../../community/modules/ai/discovery-engine
+    source: community/modules/ai/discovery-engine
     settings:
       project_id: $(vars.project_id)
       location: $(vars.location)
@@ -172,7 +173,7 @@ deployment_groups:
       engine_id: $(vars.engine)
       assistant_id: $(vars.assistant)
   - id: infra-env-file
-    source: ../../community/modules/file-system/gcs-objects
+    source: community/modules/file-system/gcs-objects
     settings:
       bucket_name: $(vars.existing_bucket_name)
       files:
@@ -195,7 +196,7 @@ deployment_groups:
 - group: colab
   modules:
   - id: stage-infra-files
-    source: ../../community/modules/file-system/gcs-sync
+    source: community/modules/file-system/gcs-sync
     settings:
       bucket_name: $(vars.existing_bucket_name)
       repo_url: $(vars.repo_url)
@@ -210,7 +211,7 @@ deployment_groups:
         - destination_path: notebook/run_notebook.ipynb
           source_path: "solutions/alphaevolve/google_framework/notebook/run_notebook.ipynb"
   - id: compute-colab
-    source: ../../community/modules/compute/colab
+    source: community/modules/compute/colab
     settings:
       project_id: $(vars.project_id)
       region: $(vars.region)

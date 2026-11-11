@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, field_validator
 class AlphaEvolveModel(str, Enum):
     """Model selection for generation."""
 
+    GEMINI_V4_ARGON = "gemini-4-argon"
     GEMINI_V3P8_FLASH = "gemini-3.8-flash"
     GEMINI_V3P7_FLASH = "gemini-3.7-flash"
     GEMINI_V3P5_FLASH = "gemini-3.5-flash"
@@ -76,8 +77,8 @@ class AlphaEvolveModelConfig(BaseModel):
     name: str = Field(
         ...,
         description=(
-            "Model name (e.g. 'gemini-3.8-flash', 'gemini-3.7-flash', "
-            "'gemini-3.5-flash', 'gemini-3.1-pro-preview')."
+            "Model name (e.g. 'gemini-4-argon', 'gemini-3.8-flash', "
+            "'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-3.1-pro-preview')."
         ),
     )
     weight: float | None = Field(
