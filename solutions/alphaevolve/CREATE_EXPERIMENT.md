@@ -29,8 +29,8 @@ Here is a high-level overview of the project structure and what you should expec
     │   ├── llm_fine_tuning_cloud_batch/
     │   ├── airfoil_optimization/
     │   └── ...
+    ├── skills/alphaevolve_experiment_creator/SKILL.md <-- Agent skill for authoring & locally testing experiments.
     ├── README.md              <-- Overview and solution guide
-    ├── AGENT.md               <-- Detailed guide for developers and agents.
     └── CREATE_EXPERIMENT.md   <-- This file.
 ```
 
@@ -60,7 +60,9 @@ Here are the most important variables and their locations:
 | `max_duration` | `blueprints/alphaevolve/alpha-evolve-experiment.yaml` | `6` | No | Absolute maximum wall-clock lifespan of the experiment run in hours (valid range: 1 to 24, default: 6). |
 | `idle_timeout` | `blueprints/alphaevolve/alpha-evolve-experiment.yaml` | `5` | No | Maximum inactivity period allowed in hours before the experiment is automatically paused (must be strictly less than `max_duration`, default: 5). |
 
-For a full list of configurable deployment variables, see the **[Agent Guide](../../blueprints/alphaevolve/AGENT.md)**.
+For the full set of configurable deployment variables, see the blueprint YAML
+files in `blueprints/alphaevolve/` (`alpha-evolve-deployment.yaml`,
+`alpha-evolve-infra.yaml`, and `alpha-evolve-experiment.yaml`).
 
 
 ### Organize your own experiment
@@ -337,12 +339,15 @@ If something goes wrong or you are getting invalid scores, check the following l
     *   `user-experiment-name/archive/program_candidates`: This is the historical archive where completed candidates and their evaluation results are moved after processing.
 *   **Retaining Job Logs**: By default, successful Cloud Batch jobs are deleted. To prevent them from being cleaned up so you can inspect machine states or validation logs, run your deployment with the `delete_succeeded_jobs` variable set to false: `gcluster deploy ... --vars delete_succeeded_jobs=false`.
 
-For a detailed walkthrough, code templates, and a full technical checklist, please refer to the **[Agent Guide](../../blueprints/alphaevolve/AGENT.md)**.
+For a detailed agent workflow, guardrails, and technical checklist, please refer
+to **[`skills/alphaevolve_experiment_creator/SKILL.md`](skills/alphaevolve_experiment_creator/SKILL.md)**.
 
 
 ## Using an AI Agent to Create Your Experiment
 
-If you want to use an AI Agent to help you create a new experiment or adapt your code to the AlphaEvolve framework, read the [AGENT.md](../../blueprints/alphaevolve/AGENT.md) file and use it to guide the agent.
+If you want to use an AI Agent to help you create a new experiment or adapt your
+code to the AlphaEvolve framework, point the agent to
+[`skills/alphaevolve_experiment_creator/SKILL.md`](skills/alphaevolve_experiment_creator/SKILL.md).
 
 Here is a suggested prompt you can give to the Agent:
 
@@ -355,7 +360,8 @@ Here is a suggested prompt you can give to the Agent:
 > **Problem Description**: [Describe what the code does and what needs to be optimized]
 > **Evaluation Metric**: [Describe how to score the candidates, e.g., execution time, accuracy, or a specific formula]
 >
-> Please read the `AGENT.md` guide in the repository and help me:
+> Please read `skills/alphaevolve_experiment_creator/SKILL.md` in
+> `solutions/alphaevolve/` and help me:
 > 1. Identify the code block to optimize and add `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END` markers.
 > 2. Create the `evaluator.py` script to score candidates based on the metric.
 > 3. Create the `experiment.yaml` declarative specification with the problem description, metrics, and seed code mapping.
