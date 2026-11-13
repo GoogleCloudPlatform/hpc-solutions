@@ -50,7 +50,6 @@ taskGroups:
                   "_EVALUATOR_IMAGE_URI",
                   "_ENGINE",
                   "_ASSISTANT",
-                  "_REGION_CODE",
               ]
               all_set = True
               for var in required_vars:
@@ -272,14 +271,29 @@ taskGroups:
           _MOUNT_PATH: "${_MOUNT_PATH}"
           _ENGINE: "${_ENGINE}"
           _ASSISTANT: "${_ASSISTANT}"
-          _REGION_CODE: "${_REGION_CODE}"
     volumes:
     - gcs:
         remotePath: "${_CLOUD_BUCKET_NAME}"
       mountPath: "${_MOUNT_PATH}"
   taskCount: 1
   parallelism: 1
+labels:
+  ghpc_blueprint: alpha-evolve-platform
+  ghpc_module: batch-job-template
+  ghpc_deployment: "${_DEPLOYMENT_NAME}"
+  goog-packaged-solution: alphaevolve
+  goog-ec-src: alphaevolve-validator
+  ae_component: validator
+  ae_experiment: "${_USER_EXPERIMENT_NAME}"
 allocationPolicy:
+  labels:
+    ghpc_blueprint: alpha-evolve-platform
+    ghpc_module: batch-job-template
+    ghpc_deployment: "${_DEPLOYMENT_NAME}"
+    goog-packaged-solution: alphaevolve
+    goog-ec-src: alphaevolve-validator
+    ae_component: validator
+    ae_experiment: "${_USER_EXPERIMENT_NAME}"
   instances:
   - policy:
       machineType: n2-standard-4

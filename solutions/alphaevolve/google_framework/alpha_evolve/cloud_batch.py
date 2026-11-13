@@ -17,7 +17,8 @@
 import json
 import logging
 import os
-from typing import Optional
+import re
+from typing import Any, Dict, Optional
 from google.api_core import exceptions as google_exceptions
 from google.cloud import batch_v1
 import yaml
@@ -26,6 +27,132 @@ from .config import ControllerConfig
 from .utils import create_full_programs_path
 
 logger = logging.getLogger(__name__)
+
+# Cloud Batch adds 4 system labels to GCE VMs/disks (64 - 4 = 60 user labels;
+# AlphaEvolve reserves 7 tracking labels, leaving up to 53 custom user labels).
+MAX_BATCH_USER_LABELS = 60
+MAX_GCP_LABEL_LENGTH = 63
+DEFAULT_BLUEPRINT_NAME = "alpha-evolve-platform"
+DEFAULT_BATCH_MODULE_NAME = "batch-job-template"
+DEFAULT_PACKAGED_SOLUTION = "alphaevolve"
+
+
+def sanitize_gcp_label_value(value: Any) -> str:
+    """Sanitizes a GCP label value to match ^[a-z0-9_-]{0,63}$.
+
+    Args:
+        value: Raw label value to normalize.
+
+    Returns:
+        Normalized label value string (<= 63 chars; empty string allowed).
+    """
+    if value is None:
+        return ""
+    cleaned = re.sub(r"[^a-z0-9_-]+", "-", str(value).strip().lower())
+    cleaned = re.sub(r"-{2,}", "-", cleaned).strip("-")
+    return cleaned[:MAX_GCP_LABEL_LENGTH].rstrip("-")
+
+
+def sanitize_gcp_label_key(key: Any) -> Optional[str]:
+    """Sanitizes a GCP label key to match ^[a-z][a-z0-9_-]{0,62}$.
+
+    Reuses value sanitization while enforcing GCP key-only rules (cannot be
+    empty and must start with a lowercase letter).
+
+    Args:
+        key: Raw label key to normalize.
+
+    Returns:
+        Normalized label key string, or None when empty after sanitization.
+    """
+    if key is None:
+        return None
+    trimmed = re.sub(r"^[^a-z0-9]+", "", str(key).lower())
+    cleaned = sanitize_gcp_label_value(trimmed)
+    if not cleaned:
+        return None
+    if not cleaned[0].isalpha():
+        cleaned = f"k_{cleaned}"[:MAX_GCP_LABEL_LENGTH].rstrip("-")
+    return cleaned
+
+
+def build_tracking_labels(
+    component: str,
+    deployment_name: str,
+    experiment_name: str,
+    blueprint_name: str = DEFAULT_BLUEPRINT_NAME,
+) -> Dict[str, str]:
+    """Builds the 7 sanitized AlphaEvolve Cloud Batch tracking labels."""
+    return {
+        "ghpc_blueprint": sanitize_gcp_label_value(blueprint_name),
+        "ghpc_module": DEFAULT_BATCH_MODULE_NAME,
+        "ghpc_deployment": sanitize_gcp_label_value(deployment_name),
+        "goog-packaged-solution": DEFAULT_PACKAGED_SOLUTION,
+        "goog-ec-src": sanitize_gcp_label_value(
+            f"{DEFAULT_PACKAGED_SOLUTION}-{component}"
+        ),
+        "ae_component": sanitize_gcp_label_value(component),
+        "ae_experiment": sanitize_gcp_label_value(experiment_name),
+    }
+
+
+def _merge_and_cap_labels(
+    existing_labels: Any,
+    tracking_labels: Dict[str, str],
+    max_labels: int = MAX_BATCH_USER_LABELS,
+) -> Dict[str, str]:
+    """Merges sanitized user labels with canonical tracking labels."""
+    custom_labels: Dict[str, str] = {}
+    if isinstance(existing_labels, dict):
+        for raw_key, raw_val in existing_labels.items():
+            safe_key = sanitize_gcp_label_key(raw_key)
+            if safe_key and safe_key not in tracking_labels:
+                custom_labels[safe_key] = sanitize_gcp_label_value(raw_val)
+
+    allowed_custom_count = max(0, max_labels - len(tracking_labels))
+    if len(custom_labels) > allowed_custom_count:
+        logger.warning(
+            "Truncating %d excess custom Batch labels (limit: %d).",
+            len(custom_labels) - allowed_custom_count,
+            max_labels,
+        )
+    kept_custom = dict(list(custom_labels.items())[:allowed_custom_count])
+    return {**tracking_labels, **kept_custom}
+
+
+def inject_batch_tracking_labels(
+    config_dict: Dict[str, Any],
+    component: str,
+    deployment_name: str,
+    experiment_name: str,
+    blueprint_name: str = DEFAULT_BLUEPRINT_NAME,
+    max_labels: int = MAX_BATCH_USER_LABELS,
+) -> Dict[str, Any]:
+    """Sanitizes and merges tracking labels into Job and allocationPolicy."""
+    if not isinstance(config_dict, dict):
+        raise TypeError("Batch job configuration must be a dictionary.")
+
+    tracking_labels = build_tracking_labels(
+        component=component,
+        deployment_name=deployment_name,
+        experiment_name=experiment_name,
+        blueprint_name=blueprint_name,
+    )
+    config_dict["labels"] = _merge_and_cap_labels(
+        config_dict.get("labels"), tracking_labels, max_labels=max_labels
+    )
+
+    alloc_policy = config_dict.get("allocationPolicy")
+    if alloc_policy is None:
+        alloc_policy = {}
+        config_dict["allocationPolicy"] = alloc_policy
+    elif not isinstance(alloc_policy, dict):
+        raise TypeError("allocationPolicy must be a dictionary.")
+
+    alloc_policy["labels"] = _merge_and_cap_labels(
+        alloc_policy.get("labels"), tracking_labels, max_labels=max_labels
+    )
+    return config_dict
 
 
 class BatchClient:
@@ -87,23 +214,34 @@ class BatchClient:
         with open(config_path, "r") as f:
             job_yaml_str = f.read()
 
-        # Replace dynamic parameters FIRST to prevent environment variable collisions
+        deployment_name = self.controller_config.deployment_name
+        experiment_name = self.controller_config.user_experiment_name
+
+        # Replace dynamic parameters first to avoid os.environ collisions
         replacements = {
             "${_JOB_ID}": job_id,
             "${_CANDIDATE_PROGRAM_ID}": candidate_program_id,
             "${_CLIENT_EVALUATOR_SCRIPT}": client_evaluator_script,
             "${_CLIENT_EVALUATOR_METHOD}": client_evaluator_method,
+            "${_DEPLOYMENT_NAME}": deployment_name,
+            "${_USER_EXPERIMENT_NAME}": experiment_name,
         }
         for placeholder, value in replacements.items():
             job_yaml_str = job_yaml_str.replace(placeholder, str(value))
 
         job_yaml_str = os.path.expandvars(job_yaml_str)
-        
+
         # Load YAML
         config_dict = yaml.safe_load(job_yaml_str)
-        
-        # Dynamically inject reservation constraint only if provisioningModel is FLEX_START
+
+        # Dynamically inject tracking labels and allocation constraints
         try:
+            inject_batch_tracking_labels(
+                config_dict,
+                component="evaluator",
+                deployment_name=deployment_name,
+                experiment_name=experiment_name,
+            )
             instances = config_dict.get("allocationPolicy", {}).get("instances", [])
             for instance in instances:
                 policy = instance.setdefault("policy", {})

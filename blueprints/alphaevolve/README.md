@@ -4,6 +4,9 @@ This directory contains declarative [Cluster Toolkit (`gcluster`)](https://docs.
 
 The core Python framework, user examples, and evaluator modules are located in [`solutions/alphaevolve`](../../solutions/alphaevolve).
 
+The solution uses the AlphaEvolve API of **Gemini Enterprise** (see
+[Supported Models](https://docs.cloud.google.com/gemini/enterprise/docs/alphaevolve/reference-guide/api-reference#supported-models)).
+
 ---
 
 ## What the solution provides
@@ -11,7 +14,7 @@ The core Python framework, user examples, and evaluator modules are located in [
 The solution provides an end-to-end flow for the configuration, deployment, and execution of the infrastructure required for AlphaEvolve optimization problems:
 
 * **Configure**: Define the overall configuration of the cloud environment (e.g., region, VM type, consumption model etc). These settings are configured in the [`alpha-evolve-deployment.yaml`](alpha-evolve-deployment.yaml) file.
-* **Deploy the Base Infrastructure**: Use Cluster Toolkit to deploy the base infrastructure required for running optimizations. In this step, necessary APIs are activated, service accounts set up, a shared Artifact Registry repository created for the base container image, a Pub/Sub topic, and a Vertex AI Colab Enterprise runtime is provisioned. This base infrastructure can be reused for multiple optimization problems. The infrastructure-as-code for this is defined in [`alpha-evolve-infra.yaml`](alpha-evolve-infra.yaml).
+* **Deploy the Base Infrastructure**: Use Cluster Toolkit to deploy the base infrastructure required for running optimizations. In this step, necessary APIs are activated, service accounts set up, a shared Artifact Registry repository created for the base container image, a Pub/Sub topic, and a Colab Enterprise runtime is provisioned. This base infrastructure can be reused for multiple optimization problems. The infrastructure-as-code for this is defined in [`alpha-evolve-infra.yaml`](alpha-evolve-infra.yaml).
 * **Configure the Software Environment**: Configure and deploy the software environment for your specific optimization problem. This Software Environment is defined in [`alpha-evolve-experiment.yaml`](alpha-evolve-experiment.yaml). It uses Cluster Toolkit (which invokes Cloud Build and Artifact Registry) to build a container image that sets up the adequate environment for your code to run in. Experiment containers inherit from the pre-built shared vanilla base image (`alpha-evolve-base:latest`), making experiment container builds fast (2–3 seconds) and cleanly isolating dependencies.
 
 The solution expects a pre-configured GCS bucket where it will store the experiment artifacts. This allows the user to tear down the aforementioned infrastructure when not in use.
@@ -22,11 +25,11 @@ The solution splits infrastructure into reusable base components and per-experim
 
 * **[`alpha-evolve-deployment.yaml`](alpha-evolve-deployment.yaml)**: Global configuration settings for your cloud environment (project, region, bucket, and VM attributes).
 * **[`alpha-evolve-infra.yaml`](alpha-evolve-infra.yaml)**: Deploys the reusable base infrastructure required for running optimizations:
-  * Activates required GCP APIs (Cloud Batch, Pub/Sub, Artifact Registry, Discovery Engine, Cloud Build, Vertex AI).
+  * Activates required GCP APIs (Gemini Enterprise / Discovery Engine, Cloud Batch, Pub/Sub, Artifact Registry, Cloud Build, Colab Enterprise).
   * Configures dedicated Service Accounts and IAM permissions.
   * Creates an Artifact Registry repository and builds the shared base container image (`alpha-evolve-base:latest`).
   * Creates Pub/Sub notification topics for Batch job tracking.
-  * Provisions a Vertex AI Colab Enterprise custom runtime.
+  * Provisions a Colab Enterprise custom runtime.
 * **[`alpha-evolve-experiment.yaml`](alpha-evolve-experiment.yaml)**: Builds and stages the software environment for a specific optimization problem:
   * Invokes Cloud Build to construct problem-specific container images inheriting from `alpha-evolve-base`.
   * Generates and stages Batch job execution templates and environment configurations to Cloud Storage (GCS).
@@ -60,14 +63,14 @@ Ensure you have:
 
 > **WARNING**: The following resources will be deployed as part of this solution. Billing accrual may occur as resources are created and used.
 
-- Discovery Engine
+- Gemini Enterprise (Discovery Engine)
 - Cloud Build
 - Cloud Batch
 - Artifact Registry
 - Cloud Storage
 - Compute Engine
 - Pub/Sub
-- Vertex AI (Colab Enterprise)
+- Colab Enterprise (Vertex AI)
 
 To get more information on pricing, see the [pricing page](https://cloud.google.com/products/pricing).
 
@@ -220,15 +223,26 @@ Now you can connect to Vertex AI Colab Enterprise and run the experiment.
 2.  **Import the notebook from Cloud Storage**:
     * Click the **Import** button (represented by an upload icon) at the top of the page.
     * In the **Import notebooks** dialog, select **Cloud Storage** as the import source.
-    * Browse your GCS bucket (configured as `BUCKET_NAME` in your deployment) and select the notebook file at `notebook/run_notebook.ipynb` (i.e., `gs://<YOUR_BUCKET_NAME>/notebook/run_notebook.ipynb`).
+    * Browse your GCS bucket (configured as `BUCKET_NAME` in your deployment)
+      and select `notebook/run_notebook.ipynb` — or paste
+      `<YOUR_BUCKET_NAME>/notebook/run_notebook.ipynb` directly (omit the
+      `gs://` prefix in the text box).
     * Click **Import**. The notebook will now appear under your **My notebooks** list. Click on it to open it.
 3.  **Connect to your custom runtime**:
-    * Open the notebook.
-    * Click the **Connect** dropdown in the top-right corner of the Colab Enterprise interface and select **Connect to custom runtime**.
-    * Select the custom runtime provisioned by your deployment (named after your `deployment_name`, e.g., `alpha-evolve-infra` or the custom name you configured).
+    * Open the notebook **before** running any cells (running a cell first will
+      spin up an unconfigured `Default` runtime).
+    * Click the **Connect** dropdown in the top-right corner of the Colab
+      Enterprise interface and select **Connect to a runtime** -> **Connect to
+      an existing runtime**.
+    * Select the custom runtime provisioned by your deployment (e.g.,
+      `colab-alpha-evolve-infra-compute-colab-...-rt`).
     * Click **Connect**.
 4.  **Run the controller**:
-    * Run the cells in the notebook to start the controller container and begin your experiment. The notebook is configured to dynamically discover available experiments from GCP project metadata and load your environment variables from GCS via an interactive prompt.
+    * Step through the cells sequentially from the top (do **not** click **Run
+      all**, since a second tutorial section later in the notebook also
+      contains a controller submission cell). The notebook verifies the `/data`
+      GCS mount, discovers your deployed experiment, validates Cloud Batch and
+      AlphaEvolve API connectivity, and submits the controller job.
 5.  **Validate Successful Run**:
     * You can monitor candidate scores and progress directly in the notebook cell execution output, specifically by executing cells under the 'Process Results Plot Optimization' section.
 6.  **Find Generated Code and Results**:
@@ -242,7 +256,19 @@ Now you can connect to Vertex AI Colab Enterprise and run the experiment.
 ... tear down your infrastructure. See section [Cleanup and Data Access](#cleanup-and-data-access) for instructions on how to do this. To stop a running experiment, simply delete the `current_experiment.json` file located under your `user_experiment_name` directory within the GCS Bucket. There is no need to submit any API call to AlphaEvolve to terminate the experiment.
 
 **If you want to pause your experimentation for a while...**
-... note that while Cloud Batch evaluation worker VMs only spin up on demand during active experiment runs, the **Colab Enterprise runtime (`n2-standard-4`) remains active** and incurs compute charges while running. An automatic **180-minute (3-hour) idle shutdown** is enabled on the runtime to power down inactive VMs and prevent continuous billing if left unattended. To halt billing immediately when inactive, simply disconnect or stop the runtime session from Colab. To resume experimentation later, re-connect to the runtime session in Jupyter / Colab. The experiment state is saved in `current_experiment.json` on GCS, allowing paused experiments to resume seamlessly from where they left off. Note that if an experiment encounters an unrecoverable failure and enters a `FAILED` state, the platform automatically deletes `current_experiment.json` so that re-running the controller initiates a fresh, clean restart.
+... note that while Cloud Batch evaluation worker VMs only spin up on demand
+during active experiment runs, the **Colab Enterprise runtime
+(`n2-standard-4`) remains active** and incurs compute charges while running. An
+automatic **180-minute (3-hour) idle shutdown** is enabled on the runtime to
+power down inactive VMs and prevent continuous billing if left unattended. To
+halt billing immediately when inactive, simply disconnect or stop the runtime
+session from Colab. To resume experimentation later, re-connect to the runtime
+session in Jupyter / Colab. The experiment state is saved in
+`current_experiment.json` on GCS, allowing paused experiments to resume
+seamlessly from where they left off. Note that if an experiment encounters an
+unrecoverable failure and enters a `FAILED` state, the platform automatically
+deletes `current_experiment.json` so that re-running the controller initiates a
+fresh, clean restart.
 
 ## Cleanup and Data Access
 

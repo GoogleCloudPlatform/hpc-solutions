@@ -99,7 +99,14 @@ user_examples/<your_experiment>/
 7.  **Add an optional `setup.sh`** if other Linux packages need to be installed for your custom environment.
 8.  **Add an optional `requirements.txt`** if extra Python packages are needed to be included for your custom environment.
 9.  **Update your `evaluator.Dockerfile`** to copy these files into the container and run/install these packages at build time if they exist. (Note: Ensure `evaluator.Dockerfile` uses `--require-hashes` if your requirements file contains pinned hashes, or installs without hashes for standard unpinned dependencies).
-10. **Add an optional `eval-batch.yaml`** if your experiment requires a custom Cloud Batch job topology (e.g., multi-node VM synchronization, passwordless SSH between worker nodes, and custom task count overrides for distributed MPI architectures) instead of using the default single-node template.
+10. **Add an optional `eval-batch.yaml`** if your experiment requires a custom
+    Cloud Batch job topology (e.g., multi-node VM synchronization, passwordless
+    SSH between worker nodes, and custom task count overrides for distributed
+    MPI architectures) instead of using the default single-node template.
+    AlphaEvolve automatically injects 7 tracking labels onto `labels` and
+    `allocationPolicy.labels` (and Cloud Batch attaches 4 system labels to GCE
+    VMs and boot disks), so custom `eval-batch.yaml` templates support up to
+    **53 custom labels** (excess custom labels are truncated with a warning).
 
 ### How to Safely Start and Test Your Experiment
 

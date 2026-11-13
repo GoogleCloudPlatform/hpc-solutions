@@ -22,7 +22,6 @@ taskGroups:
       environment:
         variables:
           _DEPLOYMENT_NAME: "${_DEPLOYMENT_NAME}"
-          _REGION_CODE: "${_REGION_CODE}"
           _ASSISTANT: "${_ASSISTANT}"
           _BASE_URL: "${_BASE_URL}"
           _COLLECTION: "${_COLLECTION}"
@@ -60,7 +59,23 @@ taskGroups:
       mountPath: "${_MOUNT_PATH}"
   taskCount: 1
   parallelism: 1
+labels:
+  ghpc_blueprint: alpha-evolve-platform
+  ghpc_module: batch-job-template
+  ghpc_deployment: "${_DEPLOYMENT_NAME}"
+  goog-packaged-solution: alphaevolve
+  goog-ec-src: alphaevolve-controller
+  ae_component: controller
+  ae_experiment: "${_USER_EXPERIMENT_NAME}"
 allocationPolicy:
+  labels:
+    ghpc_blueprint: alpha-evolve-platform
+    ghpc_module: batch-job-template
+    ghpc_deployment: "${_DEPLOYMENT_NAME}"
+    goog-packaged-solution: alphaevolve
+    goog-ec-src: alphaevolve-controller
+    ae_component: controller
+    ae_experiment: "${_USER_EXPERIMENT_NAME}"
   instances:
   - policy:
       machineType: n2-standard-4
