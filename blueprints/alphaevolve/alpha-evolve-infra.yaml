@@ -220,6 +220,10 @@ deployment_groups:
       mount_gcs_bucket: $(vars.existing_bucket_name)
       mount_path: "/data"
       colab_machine_type: $(vars.colab_machine_type)
+      labels:
+        goog-packaged-solution: alphaevolve
+        goog-ec-src: alphaevolve-notebook
+        ae_component: notebook
       environment_variables:
         _CLOUD_BUCKET_NAME: $(vars.existing_bucket_name)
         _PROJECT_ID: $(vars.project_id)

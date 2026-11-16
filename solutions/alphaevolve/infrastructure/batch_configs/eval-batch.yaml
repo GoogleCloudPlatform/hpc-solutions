@@ -70,7 +70,23 @@ taskGroups:
         - 50001
   taskCount: 1
   parallelism: 1
+labels:
+  ghpc_blueprint: alpha-evolve-platform
+  ghpc_module: batch-job-template
+  ghpc_deployment: "${_DEPLOYMENT_NAME}"
+  goog-packaged-solution: alphaevolve
+  goog-ec-src: alphaevolve-evaluator
+  ae_component: evaluator
+  ae_experiment: "${_USER_EXPERIMENT_NAME}"
 allocationPolicy:
+  labels:
+    ghpc_blueprint: alpha-evolve-platform
+    ghpc_module: batch-job-template
+    ghpc_deployment: "${_DEPLOYMENT_NAME}"
+    goog-packaged-solution: alphaevolve
+    goog-ec-src: alphaevolve-evaluator
+    ae_component: evaluator
+    ae_experiment: "${_USER_EXPERIMENT_NAME}"
   instances:
   - policy:
       machineType: "${_EVALUATION_MACHINE_TYPE}"

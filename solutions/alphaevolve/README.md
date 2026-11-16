@@ -41,7 +41,8 @@ solutions/alphaevolve/
 │   ├── signal_processing/
 │   ├── airfoil_optimization/
 │   ├── nbody_molecular_dynamics/
-│   └── llm_fine_tuning_cloud_batch/
+│   ├── llm_fine_tuning_cloud_batch/
+│   └── tpu_gemm_cloud_batch/
 ├── tools/                     # Observability and interactive tools
 │   ├── ae_shell.py            # Interactive CLI shell for inspecting experiment runs
 │   └── monitoring/            # Real-time web dashboard & lineage tree visualizer
@@ -62,6 +63,7 @@ We prepackaged a set of examples to get you started. For an overview of the prov
 | `nbody_molecular_dynamics` | C++ | `simulation_speed_score` | Multi-node MPI orchestration |
 | `airfoil_optimization` | Python | `lift_to_drag_ratio` | Uses OpenFOAM for 2D CFD simulation |
 | `llm_fine_tuning_cloud_batch` | Python | `neg_eval_loss` | GPU training/evaluation (PyTorch/LoRA) on Cloud Batch |
+| `tpu_gemm_cloud_batch` | Python | `tflops` | TPU matrix multiplication (JAX) on Cloud Batch |
 
 ---
 
