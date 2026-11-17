@@ -1,0 +1,223 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+
+# ==============================================================================
+# Cluster Toolkit (`gcluster`) Slurm Blueprint for OpenROAD + AlphaEvolve
+# ==============================================================================
+# Deploys a Slurm cluster with `c3-standard-176` compute nodes and automatically
+# runs `setup.sh --slurm` during `gcluster deploy` to provision:
+#   1. OpenROAD 26Q3 Apptainer container (`/tools/containers/openroad-2130.sif`)
+#      and executable wrapper (`/tools/bin/openroad_wrapper.sh`).
+#   2. AlphaEvolve `openroad_drt_schedule` workspace (`/scratch/openroad_drt_schedule`)
+#      and `ae` CLI runtime (`/tools/ae_poc`, optional via `ae_cli_bundle_uri`).
+#   3. The 6-design ISPD-18 / ISPD-19 Mini Dataset (`mini6`: 3 Training
+#      `ispd18_test1`, `ispd18_test2`, `ispd19_test5` + 3 Held-Out
+#      `ispd19_test1`, `ispd18_test5`, `ispd19_test3`) in `/scratch/ispd_bench`,
+#      including the DEF 5.8 `GROUPS`-after-`END COMPONENTS` fix for `ispd19_test5`.
+#      (Set `--vars stage_all20=1` to stage all 20 ISPD-18/19 benchmarks.)
+# ==============================================================================
+
+blueprint_name: openroad-ae-slurm
+
+vars:
+  project_id:  ## Set your GCP Project ID ##
+  deployment_name: openroad-ae-slurm
+  region: us-central1
+  zone: us-central1-a
+  c3_machine_type: c3-standard-176
+  c3_dynamic_max: 2
+  stage_all20: "0"      # "0" stages the 6-design Mini Dataset (`mini6`); "1" stages all 20 ISPD designs
+  ae_cli_bundle_uri: "" # Optional gs:// URI to ae_cli_bundle.tar.gz for 1-shot `ae` CLI evolution
+  ae_engine: alpha-evolve-infra-experiment-engine # Discovery Engine ID used by Step 3 (`ae` CLI evolution)
+
+deployment_groups:
+- group: primary
+  modules:
+  - id: network
+    source: modules/network/vpc
+
+  - id: homefs
+    source: modules/file-system/filestore
+    use: [network]
+    settings:
+      local_mount: /home
+
+  - id: scratchfs
+    source: modules/file-system/filestore
+    use: [network]
+    settings:
+      # BASIC_HDD (1 TiB minimum) minimizes cost for 1-2 node `mini6` runs;
+      # switch to `filestore_tier: BASIC_SSD` (`size_gb: 2560`) for larger multi-node sweeps.
+      filestore_tier: BASIC_HDD
+      size_gb: 1024
+      local_mount: /scratch
+
+  - id: compute_startup
+    source: modules/scripts/startup-script
+    settings:
+      runners:
+      - type: shell
+        destination: install_compute_runtime.sh
+        content: |
+          #!/bin/bash
+          set -e
+          mkdir -p /scratch/tools
+          if [[ ! -e /tools ]]; then
+            ln -sfn /scratch/tools /tools
+          fi
+          if ! command -v apptainer >/dev/null 2>&1; then
+            if ls /tools/rpms/*.rpm >/dev/null 2>&1; then
+              dnf install -y --disablerepo="*" /tools/rpms/*.rpm || {
+                dnf install -y epel-release
+                dnf --enablerepo=crb install -y apptainer numactl python3 jq time diffutils
+              }
+            else
+              dnf install -y epel-release
+              dnf --enablerepo=crb install -y apptainer numactl python3 jq time diffutils
+            fi
+          fi
+
+  - id: c3_nodeset
+    source: community/modules/compute/schedmd-slurm-gcp-v6-nodeset
+    use:
+    - network
+    - homefs
+    - scratchfs
+    - compute_startup
+    settings:
+      bandwidth_tier: gvnic_enabled
+      machine_type: $(vars.c3_machine_type)
+      node_count_static: 0
+      node_count_dynamic_max: $(vars.c3_dynamic_max)
+      disk_type: pd-ssd
+      disk_size_gb: 200
+
+  - id: c3_partition
+    source: community/modules/compute/schedmd-slurm-gcp-v6-partition
+    use: [c3_nodeset]
+    settings:
+      partition_name: c3
+      is_default: true
+      exclusive: false
+
+  - id: login_startup
+    source: modules/scripts/startup-script
+    settings:
+      runners:
+      - type: data
+        source: $(ghpc_stage("../setup.sh"))
+        destination: /var/tmp/openroad_ae_staged/setup.sh
+      - type: data
+        source: $(ghpc_stage("../drt_config.py"))
+        destination: /var/tmp/openroad_ae_staged/drt_config.py
+      - type: data
+        source: $(ghpc_stage("../evaluator.py"))
+        destination: /var/tmp/openroad_ae_staged/evaluator.py
+      - type: data
+        source: $(ghpc_stage("../main.py"))
+        destination: /var/tmp/openroad_ae_staged/main.py
+      - type: data
+        source: $(ghpc_stage("../experiment.yaml"))
+        destination: /var/tmp/openroad_ae_staged/experiment.yaml
+      - type: data
+        source: $(ghpc_stage("../README.md"))
+        destination: /var/tmp/openroad_ae_staged/README.md
+      - type: data
+        source: $(ghpc_stage("../evaluator.Dockerfile"))
+        destination: /var/tmp/openroad_ae_staged/evaluator.Dockerfile
+      - type: data
+        source: $(ghpc_stage("problem_description.md"))
+        destination: /var/tmp/openroad_ae_staged/problem_description.md
+      - type: data
+        source: $(ghpc_stage("run_ispd_cpp.py"))
+        destination: /var/tmp/openroad_ae_staged/run_ispd_cpp.py
+      - type: data
+        source: $(ghpc_stage("run_openroad_baseline.sbatch"))
+        destination: /var/tmp/openroad_ae_staged/run_openroad_baseline.sbatch
+      - type: data
+        source: $(ghpc_stage("run_openroad_ae_cand14_py.sbatch"))
+        destination: /var/tmp/openroad_ae_staged/run_openroad_ae_cand14_py.sbatch
+      - type: data
+        source: $(ghpc_stage("run_openroad_ae_evolve.sbatch"))
+        destination: /var/tmp/openroad_ae_staged/run_openroad_ae_evolve.sbatch
+      - type: data
+        source: $(ghpc_stage("candidates/14_oneshot_r3_winner.py"))
+        destination: /var/tmp/openroad_ae_staged/14_oneshot_r3_winner.py
+      - type: data
+        source: $(ghpc_stage("candidates/14_oneshot_r3_winner_FlexDR.cpp.patch"))
+        destination: /var/tmp/openroad_ae_staged/14_oneshot_r3_winner_FlexDR.cpp.patch
+      - type: shell
+        destination: setup_openroad_ae_slurm.sh
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          mkdir -p /scratch/tools/containers /scratch/tools/bin /scratch/tools/rpms
+          if [[ ! -e /tools ]]; then
+            ln -sfn /scratch/tools /tools
+          fi
+          mkdir -p /tools/containers /tools/bin /tools/rpms \
+            /scratch/openroad_drt_schedule/tutorial/candidates \
+            /scratch/openroad_drt_schedule/candidates \
+            /scratch/ispd_bench
+          chmod u=rwx,g=rwx,o=rwxt /scratch
+          chown -R root:root /scratch/tools /scratch/ispd_bench /scratch/openroad_drt_schedule
+          chmod -R u=rwX,go=rX /scratch/tools /scratch/ispd_bench
+
+          STAGED="/var/tmp/openroad_ae_staged"
+          for f in setup.sh drt_config.py evaluator.py main.py experiment.yaml README.md evaluator.Dockerfile; do
+            cp -f "${STAGED}/${f}" "/scratch/openroad_drt_schedule/${f}"
+          done
+          for f in problem_description.md run_ispd_cpp.py run_openroad_baseline.sbatch run_openroad_ae_cand14_py.sbatch run_openroad_ae_evolve.sbatch; do
+            cp -f "${STAGED}/${f}" "/scratch/openroad_drt_schedule/tutorial/${f}"
+          done
+          for f in 14_oneshot_r3_winner.py 14_oneshot_r3_winner_FlexDR.cpp.patch; do
+            cp -f "${STAGED}/${f}" "/scratch/openroad_drt_schedule/tutorial/candidates/${f}"
+            cp -f "${STAGED}/${f}" "/scratch/openroad_drt_schedule/candidates/${f}"
+          done
+          chown -R root:root /scratch/openroad_drt_schedule
+          chmod -R u=rwX,go=rX /scratch/openroad_drt_schedule
+          chmod 0755 /scratch/openroad_drt_schedule/setup.sh /scratch/openroad_drt_schedule/tutorial/*.sbatch
+
+          export STAGE_ALL20="$(vars.stage_all20)"
+          export AE_CLI_BUNDLE_URI="$(vars.ae_cli_bundle_uri)"
+          export AE_ENGINE="$(vars.ae_engine)"
+          export ISPD_BENCH_DIR="/scratch/ispd_bench"
+          export OPENROAD_SIF_PATH="/tools/containers/openroad-2130.sif"
+          export OPENROAD_BIN="/tools/bin/openroad_wrapper.sh"
+
+          # Run automated OpenROAD + AE + 6-design ISPD Mini Dataset setup
+          /scratch/openroad_drt_schedule/setup.sh --slurm >/var/log/openroad_ae_setup.log 2>&1
+
+  - id: slurm_login
+    source: community/modules/scheduler/schedmd-slurm-gcp-v6-login
+    use: [network, login_startup]
+    settings:
+      machine_type: n2-standard-8
+      enable_login_public_ips: false
+
+  - id: slurm_controller
+    source: community/modules/scheduler/schedmd-slurm-gcp-v6-controller
+    use:
+    - network
+    - c3_partition
+    - slurm_login
+    - homefs
+    - scratchfs
+    settings:
+      enable_controller_public_ips: false
+      enable_slurm_auth: true
+      login_startup_scripts_timeout: 1800
+      compute_startup_scripts_timeout: 900
