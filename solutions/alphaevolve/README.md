@@ -40,7 +40,17 @@ solutions/alphaevolve/
 │   ├── netlist_simulation/
 │   ├── signal_processing/
 │   ├── airfoil_optimization/
+│   ├── airfoil_openfoam/
+│   ├── heatsink_openfoam/
+│   ├── rocket_nozzle_openfoam/
+│   ├── bird_strike_wing/
+│   ├── coronary_stent_openradioss/
+│   ├── drug_discovery_docking/
+│   ├── eda_openroad_ppa_floorplan/
+│   ├── fsi_var_monte_carlo/
+│   ├── seismic_wave_propagation_stencil/
 │   ├── nbody_molecular_dynamics/
+│   ├── openroad_drt_schedule/
 │   ├── llm_fine_tuning_cloud_batch/
 │   └── tpu_gemm_cloud_batch/
 ├── tools/                     # Observability and interactive tools
@@ -62,6 +72,16 @@ We prepackaged a set of examples to get you started. For an overview of the prov
 | `signal_processing` | Python | `overall_score` | Uses SciPy |
 | `nbody_molecular_dynamics` | C++ | `simulation_speed_score` | Multi-node MPI orchestration |
 | `airfoil_optimization` | Python | `lift_to_drag_ratio` | Uses OpenFOAM for 2D CFD simulation |
+| `airfoil_openfoam` | Python | `lift_to_drag_ratio` | OpenFOAM-14 2D incompressible RANS (`airFoil2D`) CST optimization (`--vars base_evaluator_image=ubuntu:24.04`) |
+| `heatsink_openfoam` | Python | `thermal_score` | OpenFOAM-14 3D liquid-cooling cold-plate CHT (`foamMultiRun`) optimization (`--vars base_evaluator_image=ubuntu:24.04`) |
+| `rocket_nozzle_openfoam` | Python | `thrust_coefficient` | OpenFOAM-14 2D axisymmetric supersonic nozzle (`shockFluid`) optimization (`--vars base_evaluator_image=ubuntu:24.04`) |
+| `bird_strike_wing` | Python | `bird_strike_score` | OpenRADIOSS aerospace wing leading-edge SPH bird-strike optimization |
+| `coronary_stent_openradioss` | Python | `stent_clinical_fitness_score` | OpenRADIOSS L605 CoCr coronary stent deployment & recoil optimization |
+| `drug_discovery_docking` | Python | `multiparameter_docking_score` | 3D structure-based drug discovery docking & multiparameter lead optimization |
+| `eda_openroad_ppa_floorplan` | Python | `ppa_composite_score` | OpenROAD 7nm ASAP7 macro floorplanning & 3-corner PPA optimization (`--vars base_evaluator_image=docker.io/openroad/orfs:26Q3-586-gfbc8fa48d`) |
+| `fsi_var_monte_carlo` | C++ | `effective_speedup_score` | Multi-node MPI + AVX2 financial tail VaR & CVaR Monte Carlo optimization |
+| `seismic_wave_propagation_stencil` | C++ | `seismic_accuracy_speedup_score` | 2D acoustic seismic wave propagation stencil & absorbing sponge optimization |
+| `openroad_drt_schedule` | Python | `routing_qor_score` | Uses OpenROAD `drt` for detailed routing (`ISPD-18`/`ISPD-19`) |
 | `llm_fine_tuning_cloud_batch` | Python | `neg_eval_loss` | GPU training/evaluation (PyTorch/LoRA) on Cloud Batch |
 | `tpu_gemm_cloud_batch` | Python | `tflops` | TPU matrix multiplication (JAX) on Cloud Batch |
 
