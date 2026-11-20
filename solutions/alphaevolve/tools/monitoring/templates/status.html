@@ -1,197 +1,878 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>AlphaEvolve Live Progress Status</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AlphaEvolve Live Telemetry — Real-time candidate generation, evaluation throughput, and score progression trajectory.">
+  <title>Live Telemetry | AlphaEvolve Experiment Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=swap" rel="stylesheet">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; background: #f8f9fa; color: #212529; }
-    .container { max-width: 1050px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
-    h1 { color: #1a73e8; margin-top: 0; font-size: 1.8em; }
-    .status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 0.9em; }
-    .status-running { background: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
-    .status-completed { background: #e8f0fe; color: #1a73e8; border: 1px solid #d2e3fc; }
-    .status-paused { background: #fef7e0; color: #b06000; border: 1px solid #feefc3; }
-    .pulse-dot { width: 10px; height: 10px; border-radius: 50%; background: #137333; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } 100% { opacity: 1; transform: scale(1); } }
-    
-    .card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 22px; margin-top: 20px; background: #ffffff; }
-    .card-title { font-size: 1.1em; font-weight: 600; color: #3c4043; margin-top: 0; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
-    
-    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
-    .metric-box { background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; padding: 16px; text-align: center; }
-    .metric-value { font-size: 1.8em; font-weight: 700; color: #1a73e8; margin: 4px 0; }
-    .metric-label { font-size: 0.85em; color: #5f6368; font-weight: 500; }
-    
-    .progress-bar-container { background: #f1f3f4; border-radius: 8px; height: 22px; overflow: hidden; margin-top: 8px; position: relative; }
-    .progress-fill { height: 100%; transition: width 0.5s ease; background: linear-gradient(90deg, #4285f4, #34a853); }
-    .progress-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.82em; font-weight: 600; color: #212529; }
-    
-    .problem-box { background: #f8fbff; border-left: 4px solid #1a73e8; padding: 16px 20px; border-radius: 0 8px 8px 0; font-size: 0.95em; line-height: 1.5; color: #3c4043; white-space: pre-wrap; }
-    
-    .btn { display: inline-block; background: #1a73e8; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; font-weight: 500; margin-right: 10px; margin-top: 10px; }
-    .btn:hover { background: #1557b0; }
-    .btn-green { background: #188038; }
-    .btn-green:hover { background: #137333; }
-    .btn-secondary { background: #f1f3f4; color: #3c4043; border: 1px solid #dadce0; }
-    .btn-secondary:hover { background: #e8eaed; }
-    
-    .exp-switcher { background: #e8f0fe; padding: 14px 18px; border-radius: 8px; border: 1px solid #d2e3fc; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-    .chart-tab { background: transparent; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.82em; font-weight: 600; color: #5f6368; cursor: pointer; transition: all 0.2s ease; }
-    .chart-tab.active-tab { background: white; color: #1a73e8; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+    :root {
+      --gm-primary: #0b57d0;
+      --gm-primary-hover: #0842a0;
+      --gm-primary-container: #d3e3fd;
+      --gm-primary-subtle: #eff6ff;
+      --gm-on-surface: #1f1f1f;
+      --gm-on-surface-variant: #444746;
+      --gm-muted: #5f6368;
+      --gm-surface: #ffffff;
+      --gm-canvas: #f8fafd;
+      --gm-surface-dim: #f1f5f9;
+      --gm-outline: #dadce0;
+      --gm-outline-subtle: #e8eaed;
+      --gm-success-text: #146c2e;
+      --gm-success-bg: #e6f4ea;
+      --gm-warning-text: #b06000;
+      --gm-warning-bg: #fef7e0;
+      --gm-error-text: #b3261e;
+      --gm-error-bg: #fce8e6;
+      --gm-radius-sm: 6px;
+      --gm-radius-md: 8px;
+      --gm-shadow-sm: 0 1px 2px 0 rgba(60, 64, 67, 0.08), 0 1px 3px 1px rgba(60, 64, 67, 0.04);
+      --gm-shadow-md: 0 2px 6px 2px rgba(60, 64, 67, 0.08), 0 1px 2px 0 rgba(60, 64, 67, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      background-color: var(--gm-canvas);
+      color: var(--gm-on-surface);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+
+    .material-symbols-outlined {
+      font-size: 18px;
+      line-height: 1;
+      vertical-align: middle;
+      user-select: none;
+    }
+
+    /* Top App Bar */
+    .app-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: 56px;
+      background: var(--gm-surface);
+      border-bottom: 1px solid var(--gm-outline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+
+    .app-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--gm-on-surface);
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--gm-primary-subtle);
+      border: 1px solid var(--gm-primary-container);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gm-primary);
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-divider {
+      height: 18px;
+      width: 1px;
+      background: var(--gm-outline);
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gm-muted);
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 100%;
+    }
+
+    .nav-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 100%;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gm-on-surface-variant);
+      text-decoration: none;
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--gm-primary);
+      background-color: var(--gm-canvas);
+    }
+
+    .nav-tab.active {
+      color: var(--gm-primary);
+      font-weight: 600;
+      border-bottom-color: var(--gm-primary);
+    }
+
+    /* Sub-header Experiment Switcher Bar */
+    .context-bar {
+      background: var(--gm-surface);
+      border-bottom: 1px solid var(--gm-outline-subtle);
+      padding: 10px 24px;
+    }
+
+    .context-bar-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .exp-select-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .exp-select-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gm-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .exp-select {
+      padding: 6px 12px;
+      border-radius: var(--gm-radius-sm);
+      border: 1px solid var(--gm-outline);
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 500;
+      color: var(--gm-on-surface);
+      background: var(--gm-surface);
+      min-width: 340px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .exp-select:focus {
+      border-color: var(--gm-primary);
+      box-shadow: 0 0 0 2px var(--gm-primary-container);
+    }
+
+    .refresh-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .auto-refresh-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--gm-on-surface-variant);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Main Workspace */
+    .workspace {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 24px 64px;
+    }
+
+    .title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .title-bar h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      margin: 0;
+      color: var(--gm-on-surface);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
+
+    .status-running {
+      background: var(--gm-success-bg);
+      color: var(--gm-success-text);
+    }
+
+    .status-completed {
+      background: var(--gm-primary-subtle);
+      color: var(--gm-primary);
+    }
+
+    .status-paused {
+      background: var(--gm-warning-bg);
+      color: var(--gm-warning-text);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--gm-success-text);
+      animation: pulse 1.6s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(1.25); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--gm-radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid transparent;
+      font-family: inherit;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--gm-primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: var(--gm-primary-hover);
+    }
+
+    .btn-tonal {
+      background: var(--gm-primary-subtle);
+      color: var(--gm-primary);
+      border-color: var(--gm-primary-container);
+    }
+
+    .btn-tonal:hover {
+      background: var(--gm-primary-container);
+    }
+
+    .btn-secondary {
+      background: var(--gm-surface);
+      color: var(--gm-on-surface-variant);
+      border-color: var(--gm-outline);
+    }
+
+    .btn-secondary:hover {
+      background: var(--gm-canvas);
+      color: var(--gm-on-surface);
+    }
+
+    /* Cards & Grids */
+    .card {
+      background: var(--gm-surface);
+      border: 1px solid var(--gm-outline);
+      border-radius: var(--gm-radius-md);
+      padding: 20px 22px;
+      box-shadow: var(--gm-shadow-sm);
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gm-on-surface);
+      margin: 0 0 14px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .card-title-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .top-split-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 920px) {
+      .top-split-grid,
+      .bottom-split-grid {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
+    /* Hero Best Candidate Card */
+    .hero-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: var(--gm-surface);
+    }
+
+    .hero-score-value {
+      font-size: 34px;
+      font-weight: 700;
+      color: var(--gm-primary);
+      font-family: 'Roboto Mono', monospace;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin: 4px 0 6px;
+    }
+
+    .hero-badge {
+      background: var(--gm-warning-bg);
+      color: var(--gm-warning-text);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    /* Progress Bars */
+    .progress-group {
+      margin-bottom: 16px;
+    }
+
+    .progress-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .progress-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--gm-on-surface-variant);
+      margin-bottom: 6px;
+    }
+
+    .progress-bar-container {
+      background: var(--gm-surface-dim);
+      border-radius: 999px;
+      height: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      background: var(--gm-primary);
+    }
+
+    .progress-fill.eval-fill {
+      background: #188038;
+    }
+
+    .progress-text {
+      display: none;
+    }
+
+    /* 4-Metric KPI Grid */
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .metric-box {
+      background: var(--gm-surface);
+      border: 1px solid var(--gm-outline);
+      border-radius: var(--gm-radius-md);
+      padding: 16px 18px;
+      box-shadow: var(--gm-shadow-sm);
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .metric-label {
+      font-size: 11.5px;
+      color: var(--gm-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gm-on-surface);
+      font-family: 'Roboto Mono', monospace;
+      margin: 2px 0 4px;
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: var(--gm-muted);
+    }
+
+    /* Segmented Chart Tabs */
+    .segmented-group {
+      display: inline-flex;
+      background: var(--gm-surface-dim);
+      padding: 3px;
+      border-radius: var(--gm-radius-sm);
+      border: 1px solid var(--gm-outline-subtle);
+    }
+
+    .chart-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: transparent;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      color: var(--gm-on-surface-variant);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chart-tab.active-tab {
+      background: var(--gm-surface);
+      color: var(--gm-primary);
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Bottom 2-Column Details Grid */
+    .bottom-split-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .problem-box {
+      background: var(--gm-canvas);
+      border: 1px solid var(--gm-outline-subtle);
+      padding: 14px 16px;
+      border-radius: var(--gm-radius-sm);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--gm-on-surface-variant);
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .cfg-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .cfg-table tr {
+      border-bottom: 1px solid var(--gm-outline-subtle);
+    }
+
+    .cfg-table tr:last-child {
+      border-bottom: none;
+    }
+
+    .cfg-table td {
+      padding: 9px 6px;
+      vertical-align: top;
+    }
+
+    .cfg-key {
+      font-weight: 500;
+      color: var(--gm-muted);
+      width: 175px;
+    }
+
+    code {
+      font-family: 'Roboto Mono', monospace;
+      background: var(--gm-surface-dim);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--gm-on-surface);
+    }
+
+    #loading {
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--gm-muted);
+      font-size: 13.5px;
+      background: var(--gm-surface);
+      border: 1px solid var(--gm-outline);
+      border-radius: var(--gm-radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--gm-outline);
+      border-top-color: var(--gm-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <div class="container">
-    <a href="/" style="color: #1a73e8; text-decoration: none; font-weight: 600;">&larr; Back to Dashboard Home</a>
-    
-    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-top: 12px;">
-      <h1 style="margin:0;"><span id="exp-title">Loading experiment status...</span></h1>
-      <div id="status-badge-container"></div>
+  <!-- Google Cloud Standard Top App Bar -->
+  <header class="app-bar">
+    <div style="display: flex; align-items: center; gap: 24px; height: 100%;">
+      <div class="app-brand">
+        <div class="brand-icon">
+          <span class="material-symbols-outlined">hub</span>
+        </div>
+        <span class="brand-title">AlphaEvolve</span>
+      </div>
+      <nav class="nav-tabs" aria-label="Main Navigation">
+        <a href="/" class="nav-tab">
+          <span class="material-symbols-outlined">folder_managed</span>
+          Experiments
+        </a>
+        <a href="/status" class="nav-tab active" id="nav-status-link">
+          <span class="material-symbols-outlined">monitoring</span>
+          Live Telemetry
+        </a>
+        <a href="/lineage" class="nav-tab" id="nav-lineage-link">
+          <span class="material-symbols-outlined">account_tree</span>
+          Lineage Explorer
+        </a>
+      </nav>
     </div>
-
-    <div class="exp-switcher" style="margin-top:16px;">
-      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <label for="exp-selector" style="font-weight: 600; color: #1a73e8;">Switch Active Experiment:</label>
-        <select id="exp-selector" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #1a73e8; font-size: 0.95rem; min-width: 360px; background: white;"></select>
-      </div>
-      <label style="font-size: 0.88em; font-weight: 600; color: #3c4043; cursor: pointer;">
-        <input type="checkbox" id="auto-refresh-check" checked onchange="toggleAutoRefresh()"> 🔄 Live Auto-refresh (5s)
-      </label>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <a class="btn btn-tonal" id="cta-lineage" href="#" style="padding: 5px 12px; font-size: 12.5px;">
+        <span class="material-symbols-outlined">account_tree</span>
+        Explore Lineage Graph
+      </a>
+      <a class="btn btn-secondary" id="cta-json" href="#" target="_blank" style="padding: 5px 10px; font-size: 12px;">
+        <span class="material-symbols-outlined" style="font-size: 16px;">data_object</span>
+        Status JSON
+      </a>
     </div>
+  </header>
 
-    <div id="loading"><strong>🔍 Fetching live execution statistics from AlphaEvolve API...</strong></div>
-    
-    <div id="content" style="display: none;">
-      <!-- Execution Progression Bars -->
-      <div class="card">
-        <div class="card-title">📈 Candidate Evolution Progression</div>
-        
-        <div style="margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; font-size: 0.9em; font-weight: 600;">
-            <span>Candidates Generated</span>
-            <span id="gen-prog-label">0 / 0 (0%)</span>
-          </div>
-          <div class="progress-bar-container">
-            <div class="progress-fill" id="gen-prog-bar" style="width: 0%;"></div>
-            <div class="progress-text" id="gen-prog-text">0%</div>
-          </div>
-        </div>
-
-        <div>
-          <div style="display: flex; justify-content: space-between; font-size: 0.9em; font-weight: 600;">
-            <span>Candidates Evaluated</span>
-            <span id="eval-prog-label">0 / 0 (0%)</span>
-          </div>
-          <div class="progress-bar-container">
-            <div class="progress-fill" id="eval-prog-bar" style="width: 0%; background: linear-gradient(90deg, #34a853, #188038);"></div>
-            <div class="progress-text" id="eval-prog-text">0%</div>
-          </div>
-        </div>
+  <!-- Contextual Experiment Switcher Bar -->
+  <div class="context-bar">
+    <div class="context-bar-inner">
+      <div class="exp-select-group">
+        <label for="exp-selector" class="exp-select-label">Experiment</label>
+        <select id="exp-selector" class="exp-select"></select>
       </div>
-
-      <!-- Best Score Hero Card -->
-      <div class="card" style="background: linear-gradient(135deg, #fff8e1, #ffffff); border: 2px solid #f9ab00;">
-        <div class="card-title" style="color: #b06000;">
-          <span>🏆 Best Evaluated Candidate Score Achieved So Far</span>
-          <span id="best-score-badge" style="background:#f9ab00; color:white; padding:4px 10px; border-radius:14px; font-size:0.82em;">TOP CANDIDATE</span>
-        </div>
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
-          <div>
-            <div style="font-size: 2.4em; font-weight: 800; color: #e37400;" id="hero-best-score">N/A</div>
-            <div style="font-size: 0.9em; color: #5f6368;" id="hero-best-sub">No programs evaluated yet</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-weight:600; font-size:0.95em;" id="hero-best-metrics"></div>
-            <a class="btn btn-green" id="btn-inspect-best" href="#" style="margin-top:8px; display:inline-block; font-size:0.88em;">🔍 View Best Program in Lineage Forest</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Live Metric Summary Grid -->
-      <div class="grid-4">
-        <div class="metric-box">
-          <div class="metric-label">TOTAL PROGRAMS CREATED</div>
-          <div class="metric-value" id="val-candidates">0</div>
-          <div class="metric-label" id="val-candidates-sub">Candidates in Forest</div>
-        </div>
-        <div class="metric-box">
-          <div class="metric-label">EVALUATED PROGRAMS</div>
-          <div class="metric-value" id="val-evaluated" style="color: #34a853;">0</div>
-          <div class="metric-label" id="val-pending-sub">0 Pending Queue</div>
-        </div>
-        <div class="metric-box">
-          <div class="metric-label">LLM INPUT TOKENS</div>
-          <div class="metric-value" id="val-in-tokens" style="font-size:1.5em; color:#5f6368;">0</div>
-          <div class="metric-label">Prompt &amp; Seed Context</div>
-        </div>
-        <div class="metric-box">
-          <div class="metric-label">LLM OUTPUT TOKENS</div>
-          <div class="metric-value" id="val-out-tokens" style="font-size:1.5em; color:#e37400;">0</div>
-          <div class="metric-label">Generated Code Volume</div>
-        </div>
-      </div>
-
-      <!-- Settings & Configuration Details -->
-      <div class="card">
-        <div class="card-title">⚙️ Experiment Execution &amp; Resource Configuration</div>
-        <table style="width:100%; border-collapse:collapse;">
-          <tbody>
-            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368; width:220px;">Target Program Language</td><td id="cfg-lang"><code>-</code></td></tr>
-            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">Max Program Budget</td><td id="cfg-max-prog"><code>-</code></td></tr>
-            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">Evaluation Concurrency</td><td id="cfg-concurrency"><code>-</code> parallel workers</td></tr>
-            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">Max Execution Time</td><td id="cfg-duration"><code>-</code></td></tr>
-            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">LLM Mutation Model</td><td id="cfg-model"><code>-</code></td></tr>
-            <tr style="border-bottom:1px solid #f1f3f4;"><td style="padding:10px; font-weight:600; color:#5f6368;">Experiment Creation Time</td><td id="cfg-create-time">-</td></tr>
-            <tr><td style="padding:10px; font-weight:600; color:#5f6368;">Full Resource ID</td><td id="cfg-resource-id" style="word-break:break-all;"><code>-</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Problem Description -->
-      <div class="card">
-        <div class="card-title">🎯 Problem Statement &amp; Multi-Objective Optimization Criteria</div>
-        <div class="problem-box" id="problem-desc-text"></div>
-      </div>
-
-      <!-- Fitness Progression Over Time Chart -->
-      <div class="card" style="margin-top:20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
-          <div>
-            <div class="card-title" style="margin-bottom:2px;">📈 Best Metric Score Progression Trajectory</div>
-            <div style="font-size:12px; color:#5f6368;">Track how mathematical candidate quality improved as mutations explored new code solutions.</div>
-          </div>
-          <div style="display:flex; gap:6px; background:#f1f3f4; padding:4px; border-radius:8px;">
-            <button id="mode-gen-btn" class="chart-tab active-tab" onclick="switchProgressionMode('gen')">🧬 By Evolution Generation Order</button>
-            <button id="mode-clock-btn" class="chart-tab" onclick="switchProgressionMode('clock')">⏱️ By Wall-Clock Completion Time</button>
-          </div>
-        </div>
-
-        <div id="chart-container" style="position:relative; width:100%; height:260px; background:#fafafa; border:1px solid #e0e0e0; border-radius:8px; padding:16px;">
-          <svg id="progression-svg" width="100%" height="100%" viewBox="0 0 800 220" preserveAspectRatio="none" style="overflow:visible;"></svg>
-          <div id="chart-tooltip" style="position:absolute; display:none; background:rgba(32,33,36,0.92); color:#fff; padding:8px 12px; border-radius:6px; font-size:12px; pointer-events:none; z-index:20; box-shadow:0 4px 12px rgba(0,0,0,0.25); white-space:nowrap;"></div>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px; color:#70757a;">
-          <span>Legend: <strong style="color:#1e8e3e;">&mdash;&mdash; Peak Score Achieved So Far</strong> &nbsp;|&nbsp; <span style="color:#1a73e8;">&bull; Individual Evaluated Candidate</span></span>
-          <span id="chart-info-text">Showing 0 evaluated steps</span>
-        </div>
-      </div>
-
-      <!-- Navigation CTAs -->
-      <div style="margin-top: 24px; display:flex; gap:12px; flex-wrap:wrap;">
-        <a class="btn btn-green" id="cta-lineage" href="#">🌳 Explore Evolutionary Lineage Forest &amp; Source Code</a>
-        <a class="btn btn-secondary" id="cta-json" href="#" target="_blank">📄 View Programmatic REST JSON (/api/status)</a>
+      <div class="refresh-controls">
+        <label class="auto-refresh-label">
+          <input type="checkbox" id="auto-refresh-check" checked onchange="toggleAutoRefresh()">
+          <span id="auto-refresh-text">Auto-refresh (5s)</span>
+        </label>
+        <button class="btn btn-secondary" onclick="fetchStatus(true)" style="padding: 5px 10px; font-size: 12px;">
+          <span class="material-symbols-outlined" style="font-size: 16px;">refresh</span>
+          Refresh
+        </button>
       </div>
     </div>
   </div>
 
+  <main class="workspace">
+    <div class="title-bar">
+      <h1 id="exp-title">Loading experiment telemetry...</h1>
+      <div id="status-badge-container"></div>
+    </div>
+
+    <div id="loading">
+      <div class="spinner"></div>
+      <span>Fetching live execution statistics from AlphaEvolve API...</span>
+    </div>
+
+    <div id="content" style="display: none;">
+      <!-- Top Row: Best Score Card + Progression Gauges -->
+      <div class="top-split-grid">
+        <!-- Best Score Hero Card -->
+        <div class="card hero-card">
+          <div>
+            <div class="card-title">
+              <span class="card-title-left">
+                <span class="material-symbols-outlined" style="color: #e37400;">emoji_events</span>
+                <span>Top Evaluated Candidate Score</span>
+              </span>
+              <span id="best-score-badge" class="hero-badge">LEADER</span>
+            </div>
+            <div class="hero-score-value" id="hero-best-score">N/A</div>
+            <div style="font-size: 12.5px; color: var(--gm-muted);" id="hero-best-sub">No programs evaluated yet</div>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--gm-outline-subtle);">
+            <div style="font-size: 12.5px; color: var(--gm-on-surface-variant);" id="hero-best-metrics"></div>
+            <a class="btn btn-primary" id="btn-inspect-best" href="#" style="padding: 6px 12px; font-size: 12.5px;">
+              <span class="material-symbols-outlined" style="font-size: 16px;">code_blocks</span>
+              Inspect Candidate in Lineage
+            </a>
+          </div>
+        </div>
+
+        <!-- Execution Progression Bars -->
+        <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+          <div class="card-title">
+            <span class="card-title-left">
+              <span class="material-symbols-outlined" style="color: var(--gm-primary);">trending_up</span>
+              <span>Candidate Evolution Progression</span>
+            </span>
+          </div>
+
+          <div class="progress-group">
+            <div class="progress-label-row">
+              <span>Candidates Generated</span>
+              <span id="gen-prog-label" style="font-family: 'Roboto Mono', monospace; font-weight: 600;">0 / 0 (0%)</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-fill" id="gen-prog-bar" style="width: 0%;"></div>
+              <div class="progress-text" id="gen-prog-text">0%</div>
+            </div>
+          </div>
+
+          <div class="progress-group">
+            <div class="progress-label-row">
+              <span>Candidates Evaluated</span>
+              <span id="eval-prog-label" style="font-family: 'Roboto Mono', monospace; font-weight: 600;">0 / 0 (0%)</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-fill eval-fill" id="eval-prog-bar" style="width: 0%;"></div>
+              <div class="progress-text" id="eval-prog-text">0%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4-Card Telemetry KPI Strip -->
+      <div class="grid-4">
+        <div class="metric-box">
+          <div class="metric-header">
+            <span class="metric-label">Programs Created</span>
+            <span class="material-symbols-outlined" style="color: var(--gm-primary);">dataset</span>
+          </div>
+          <div class="metric-value" id="val-candidates">0</div>
+          <div class="metric-sub" id="val-candidates-sub">Total candidates in forest</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-header">
+            <span class="metric-label">Evaluated Programs</span>
+            <span class="material-symbols-outlined" style="color: var(--gm-success-text);">fact_check</span>
+          </div>
+          <div class="metric-value" id="val-evaluated" style="color: var(--gm-success-text);">0</div>
+          <div class="metric-sub" id="val-pending-sub">0 pending in queue</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-header">
+            <span class="metric-label">LLM Input Tokens</span>
+            <span class="material-symbols-outlined" style="color: var(--gm-muted);">input</span>
+          </div>
+          <div class="metric-value" id="val-in-tokens">0</div>
+          <div class="metric-sub">Prompt &amp; seed context</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-header">
+            <span class="metric-label">LLM Output Tokens</span>
+            <span class="material-symbols-outlined" style="color: #b06000;">output</span>
+          </div>
+          <div class="metric-value" id="val-out-tokens">0</div>
+          <div class="metric-sub">Generated candidate code</div>
+        </div>
+      </div>
+
+      <!-- Fitness Progression Over Time Chart -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <div class="card-title" style="margin-bottom: 2px;">
+              <span class="card-title-left">
+                <span class="material-symbols-outlined" style="color: var(--gm-primary);">show_chart</span>
+                <span>Score Progression Trajectory</span>
+              </span>
+            </div>
+            <div style="font-size: 12.5px; color: var(--gm-muted);">Candidate evaluation scores and cumulative peak frontier across the experiment lifecycle.</div>
+          </div>
+          <div class="segmented-group" role="tablist">
+            <button id="mode-gen-btn" class="chart-tab active-tab" onclick="switchProgressionMode('gen')">
+              <span class="material-symbols-outlined" style="font-size: 15px;">tag</span>
+              Generation Order
+            </button>
+            <button id="mode-clock-btn" class="chart-tab" onclick="switchProgressionMode('clock')">
+              <span class="material-symbols-outlined" style="font-size: 15px;">schedule</span>
+              Wall-Clock Time
+            </button>
+          </div>
+        </div>
+
+        <div id="chart-container" style="position: relative; width: 100%; height: 270px; background: var(--gm-canvas); border: 1px solid var(--gm-outline-subtle); border-radius: var(--gm-radius-sm); padding: 16px;">
+          <svg id="progression-svg" width="100%" height="100%" viewBox="0 0 800 238" preserveAspectRatio="xMidYMid meet" style="overflow: visible;"></svg>
+          <div id="chart-tooltip" style="position: absolute; display: none; background: rgba(31, 31, 31, 0.94); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 12px; pointer-events: none; z-index: 20; box-shadow: var(--gm-shadow-md); white-space: nowrap;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; color: var(--gm-muted); flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 14px; height: 3px; background: #188038; border-radius: 2px;"></span>
+              <span id="legend-frontier-label">Best Score Frontier</span>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 8px; height: 8px; background: #f9ab00; border-radius: 50%;"></span>
+              New Record Candidate
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              <span style="display: inline-block; width: 8px; height: 8px; background: #0b57d0; border-radius: 50%;"></span>
+              Evaluated Candidate
+            </span>
+          </div>
+          <span id="chart-info-text">Showing 0 evaluated steps</span>
+        </div>
+      </div>
+
+      <!-- Bottom Split Grid: Problem Statement & Configuration -->
+      <div class="bottom-split-grid">
+        <!-- Problem Description -->
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-left">
+              <span class="material-symbols-outlined" style="color: var(--gm-primary);">description</span>
+              <span>Problem Statement &amp; Optimization Criteria</span>
+            </span>
+          </div>
+          <div class="problem-box" id="problem-desc-text"></div>
+        </div>
+
+        <!-- Settings & Configuration Details -->
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-left">
+              <span class="material-symbols-outlined" style="color: var(--gm-muted);">tune</span>
+              <span>Execution &amp; Resource Configuration</span>
+            </span>
+          </div>
+          <table class="cfg-table">
+            <tbody>
+              <tr><td class="cfg-key">Program Language</td><td id="cfg-lang"><code>-</code></td></tr>
+              <tr><td class="cfg-key">Max Program Budget</td><td id="cfg-max-prog"><code>-</code></td></tr>
+              <tr><td class="cfg-key">Evaluation Concurrency</td><td id="cfg-concurrency"><code>-</code></td></tr>
+              <tr><td class="cfg-key">Max Execution Duration</td><td id="cfg-duration"><code>-</code></td></tr>
+              <tr><td class="cfg-key">LLM Mutation Model</td><td id="cfg-model"><code>-</code></td></tr>
+              <tr><td class="cfg-key">Created At</td><td id="cfg-create-time" style="font-size: 12.5px; color: var(--gm-on-surface-variant);">-</td></tr>
+              <tr><td class="cfg-key">Resource Name</td><td id="cfg-resource-id" style="word-break: break-all;"><code>-</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
   <script>
     let currentExp = null;
     let refreshTimer = null;
+    let isFetchingStatus = false;
+    let currentExpState = 'UNKNOWN';
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function isTerminalState(state) {
+      const s = String(state || '').toUpperCase();
+      return s === 'COMPLETED' || s === 'FAILED' || s === 'CANCELLED' || s === 'CANCELED' || s === 'STOPPED';
+    }
 
     function formatNumber(num) {
       if (num === undefined || num === null) return '0';
       const n = parseInt(num, 10);
       return isNaN(n) ? num.toString() : n.toLocaleString();
+    }
+
+    function formatScore(v, compact = false) {
+      if (v === null || v === undefined) return 'N/A';
+      if (typeof v !== 'number') return String(v);
+      if (!Number.isFinite(v)) return String(v);
+      const abs = Math.abs(v);
+      if (abs === 0) return '0';
+      if (abs < 1e-4 || abs >= 1e6) {
+        return v.toExponential(compact ? 2 : 3);
+      }
+      if (abs >= 1000) {
+        return Number.isInteger(v) ? String(v) : v.toFixed(compact ? 1 : 2);
+      }
+      if (abs >= 10) {
+        return v.toFixed(compact ? 2 : 3);
+      }
+      if (abs >= 0.01) {
+        return v.toFixed(compact ? 3 : 5);
+      }
+      return v.toFixed(compact ? 4 : 6);
     }
 
     async function initPage() {
@@ -205,7 +886,7 @@
       selector.innerHTML = '';
 
       if (exps.length === 0 && !currentExp) {
-        document.getElementById('loading').innerHTML = '<span style="color:red;">No experiments found.</span>';
+        document.getElementById('loading').innerHTML = '<span class="material-symbols-outlined" style="color:var(--gm-error-text);">error</span><span style="color:var(--gm-error-text);">No active experiments found in this project.</span>';
         return;
       }
 
@@ -213,7 +894,7 @@
         const opt = document.createElement('option');
         opt.value = e.name;
         const t = (e.config && e.config.title) ? e.config.title : e.name.split('/').pop();
-        opt.textContent = `${t} (${e.state || 'UNSPECIFIED'}) - ${e.name.split('/').pop()}`;
+        opt.textContent = `${t} (${e.state || 'UNSPECIFIED'}) — ${e.name.split('/').pop()}`;
         selector.appendChild(opt);
       });
 
@@ -222,21 +903,35 @@
       }
       if (currentExp) {
         selector.value = currentExp;
+        const enc = encodeURIComponent(currentExp);
+        document.getElementById('nav-status-link').href = `/status?exp=${enc}`;
+        document.getElementById('nav-lineage-link').href = `/lineage?exp=${enc}`;
       }
 
       selector.onchange = function() {
         window.location.search = '?exp=' + encodeURIComponent(this.value);
       };
 
-      await fetchStatus();
-      toggleAutoRefresh();
+      window.addEventListener('resize', () => {
+        if (cachedStats) renderProgressionChart(cachedStats);
+      });
+
+      await fetchStatus(false);
     }
 
-    async function fetchStatus() {
+    async function fetchStatus(forceRefresh = false) {
+      if (!currentExp || isFetchingStatus) return;
+      isFetchingStatus = true;
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+
       try {
-        const res = await fetch('/api/status?exp=' + encodeURIComponent(currentExp));
+        const refreshParam = forceRefresh ? '&refresh=1' : '';
+        const res = await fetch('/api/status?exp=' + encodeURIComponent(currentExp) + refreshParam);
         const data = await res.json();
-        
+
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
 
@@ -252,20 +947,35 @@
         const title = cfg.title || data.short_id || 'AlphaEvolve Experiment';
         document.getElementById('exp-title').innerText = title;
 
-        const state = data.state || raw.state || 'UNKNOWN';
+        const state = (data.state || raw.state || 'UNKNOWN').toUpperCase();
+        currentExpState = state;
         const badgeContainer = document.getElementById('status-badge-container');
         if (state === 'RUNNING') {
-          badgeContainer.innerHTML = '<div class="status-badge status-running"><div class="pulse-dot"></div> RUNNING (LIVE MUTATION)</div>';
+          badgeContainer.innerHTML = '<div class="status-badge status-running"><div class="pulse-dot"></div> RUNNING</div>';
         } else if (state === 'COMPLETED') {
-          badgeContainer.innerHTML = '<div class="status-badge status-completed">✔ COMPLETED</div>';
+          badgeContainer.innerHTML = '<div class="status-badge status-completed"><span class="material-symbols-outlined" style="font-size:15px;">check_circle</span> COMPLETED</div>';
         } else {
-          badgeContainer.innerHTML = `<div class="status-badge status-paused">⏸ ${state}</div>`;
+          badgeContainer.innerHTML = `<div class="status-badge status-paused"><span class="material-symbols-outlined" style="font-size:15px;">pause_circle</span> ${escapeHtml(state)}</div>`;
+        }
+
+        // Stop auto-polling once the experiment reaches a terminal state
+        const check = document.getElementById('auto-refresh-check');
+        const refreshText = document.getElementById('auto-refresh-text');
+        if (isTerminalState(state)) {
+          if (check && check.checked) {
+            check.checked = false;
+          }
+          if (refreshText) {
+            refreshText.innerText = `Auto-refresh (${state.toLowerCase()})`;
+          }
+        } else if (refreshText) {
+          refreshText.innerText = 'Auto-refresh (5s)';
         }
 
         // Progression Gauges
         const candCount = stats.candidates_count !== undefined ? stats.candidates_count : (stats.candidatesCount || 0);
         const evalCount = stats.evaluated_candidates_count !== undefined ? stats.evaluated_candidates_count : (stats.evaluatedCandidatesCount || 0);
-        const maxBudget = runSettings.maxPrograms || 100;
+        const maxBudget = runSettings.maxPrograms || runSettings.max_programs || 100;
 
         const genPct = maxBudget > 0 ? Math.min(100, Math.round((candCount / maxBudget) * 100)) : 100;
         const evalPct = candCount > 0 ? Math.min(100, Math.round((evalCount / candCount) * 100)) : 100;
@@ -274,7 +984,7 @@
         document.getElementById('gen-prog-bar').style.width = `${genPct}%`;
         document.getElementById('gen-prog-text').innerText = `${genPct}% Generated`;
 
-        document.getElementById('eval-prog-label').innerText = `${formatNumber(evalCount)} / ${formatNumber(candCount)} Evaluated (${evalPct}%)`;
+        document.getElementById('eval-prog-label').innerText = `${formatNumber(evalCount)} / ${formatNumber(candCount)} (${evalPct}%)`;
         document.getElementById('eval-prog-bar').style.width = `${evalPct}%`;
         document.getElementById('eval-prog-text').innerText = `${evalPct}% Evaluated`;
 
@@ -282,7 +992,7 @@
         document.getElementById('val-candidates').innerText = formatNumber(candCount);
         document.getElementById('val-evaluated').innerText = formatNumber(evalCount);
         const pending = Math.max(0, candCount - evalCount);
-        document.getElementById('val-pending-sub').innerText = `${pending} Pending in Concurrency Queue`;
+        document.getElementById('val-pending-sub').innerText = `${pending} pending in evaluation queue`;
 
         const rawStats = raw.stats || {};
         const inTokens = stats.input_token_count || stats.inputTokenCount || rawStats.inputTokenCount || rawStats.input_token_count || 0;
@@ -292,7 +1002,8 @@
 
         // Best Candidate Score Hero Card
         const bestScore = stats.best_score;
-        const mainMetric = stats.main_metric || 'score';
+        const mainMetric = stats.main_metric || data.main_metric || 'score';
+        const higherIsBetter = (stats.higher_is_better !== undefined) ? Boolean(stats.higher_is_better) : (data.higher_is_better !== false);
         const bestProgId = stats.best_program_id;
         const bestScoresMap = stats.best_scores_map || {};
         const heroScoreEl = document.getElementById('hero-best-score');
@@ -302,29 +1013,32 @@
         const bestBadgeEl = document.getElementById('best-score-badge');
 
         if (bestScore !== null && bestScore !== undefined) {
-          heroScoreEl.innerText = typeof bestScore === 'number' ? bestScore.toFixed(5) : bestScore;
-          heroSubEl.innerHTML = `Leader Candidate ID: <strong style="color:#1a73e8;">Prog ${bestProgId}</strong> &bull; Primary Metric: <code>${mainMetric}</code>`;
-          if (bestBadgeEl) bestBadgeEl.innerText = `MAIN METRIC: ${mainMetric.toUpperCase()}`;
-          
-          const metricsPairs = Object.entries(bestScoresMap).map(([k, v]) => `${k}: <code>${typeof v === 'number' ? v.toFixed(4) : v}</code>`);
-          heroMetricsEl.innerHTML = metricsPairs.join(' &bull; ');
-          inspectBestBtn.style.display = 'inline-block';
+          heroScoreEl.innerText = typeof bestScore === 'number' ? formatScore(bestScore, false) : bestScore;
+          const dirTag = higherIsBetter ? 'higher is better ↑' : 'lower is better ↓';
+          heroSubEl.innerHTML = `Candidate <strong style="color:var(--gm-primary);">Program ${escapeHtml(bestProgId)}</strong> &middot; Metric: <code>${escapeHtml(mainMetric)}</code> (${dirTag})`;
+          if (bestBadgeEl) {
+            bestBadgeEl.innerText = `${mainMetric.toUpperCase()} (${higherIsBetter ? 'MAX ↑' : 'MIN ↓'})`;
+          }
+
+          const metricsPairs = Object.entries(bestScoresMap).map(([k, v]) => `<span style="margin-right:10px;">${escapeHtml(k)}: <code>${typeof v === 'number' ? escapeHtml(formatScore(v, false)) : escapeHtml(v)}</code></span>`);
+          heroMetricsEl.innerHTML = metricsPairs.join('');
+          inspectBestBtn.style.display = 'inline-flex';
           inspectBestBtn.href = `/lineage?exp=${encodeURIComponent(currentExp)}&prog=${encodeURIComponent(bestProgId)}`;
         } else {
           heroScoreEl.innerText = 'N/A';
-          heroSubEl.innerText = 'No candidate evaluation scores generated yet';
+          heroSubEl.innerText = 'No candidate evaluation scores recorded yet';
           heroMetricsEl.innerHTML = '';
           inspectBestBtn.style.display = 'none';
         }
 
         // Configuration Details
-        document.getElementById('cfg-lang').innerHTML = `<code>${cfg.program_language || cfg.programLanguage || 'python'}</code>`;
+        document.getElementById('cfg-lang').innerHTML = `<code>${escapeHtml(cfg.program_language || cfg.programLanguage || 'python')}</code>`;
         document.getElementById('cfg-max-prog').innerHTML = `<code>${formatNumber(maxBudget)} candidates</code>`;
-        document.getElementById('cfg-concurrency').innerHTML = `<code>${runSettings.concurrency || 4}</code>`;
-        document.getElementById('cfg-duration').innerHTML = `<code>${runSettings.maxDuration || '86400s'}</code>`;
-        document.getElementById('cfg-model').innerHTML = `<code>${modelName}</code>`;
-        document.getElementById('cfg-create-time').innerText = data.create_time || raw.createTime || '-';
-        document.getElementById('cfg-resource-id').innerHTML = `<code>${data.name || currentExp}</code>`;
+        document.getElementById('cfg-concurrency').innerHTML = `<code>${escapeHtml(runSettings.concurrency || 4)} parallel workers</code>`;
+        document.getElementById('cfg-duration').innerHTML = `<code>${escapeHtml(runSettings.maxDuration || runSettings.max_duration || '86400s')}</code>`;
+        document.getElementById('cfg-model').innerHTML = `<code>${escapeHtml(modelName)}</code>`;
+        document.getElementById('cfg-create-time').innerText = data.create_time || raw.createTime || raw.create_time || '-';
+        document.getElementById('cfg-resource-id').innerHTML = `<code>${escapeHtml(data.name || currentExp)}</code>`;
 
         // Problem Statement
         document.getElementById('problem-desc-text').innerText = cfg.problem_description || cfg.problemDescription || 'No problem description provided.';
@@ -333,11 +1047,12 @@
         document.getElementById('cta-lineage').href = '/lineage?exp=' + encodeURIComponent(currentExp);
         document.getElementById('cta-json').href = '/api/status?exp=' + encodeURIComponent(currentExp);
 
-        // Render progression chart
         renderProgressionChart(stats);
-
       } catch (err) {
         console.error('Error fetching status:', err);
+      } finally {
+        isFetchingStatus = false;
+        scheduleNextPoll();
       }
     }
 
@@ -353,108 +1068,165 @@
 
     function renderProgressionChart(stats) {
       cachedStats = stats;
+      const higherIsBetter = stats.higher_is_better !== false;
       const series = currentProgressionMode === 'clock' ? (stats.progression_by_clock || []) : (stats.progression_by_gen || []);
       const svg = document.getElementById('progression-svg');
+      const container = document.getElementById('chart-container');
       const tooltip = document.getElementById('chart-tooltip');
       const infoEl = document.getElementById('chart-info-text');
+      const frontierLabelEl = document.getElementById('legend-frontier-label');
       if (!svg) return;
       svg.innerHTML = '';
+
+      if (frontierLabelEl) {
+        frontierLabelEl.innerText = higherIsBetter ? 'Best Score Frontier (Max ↑)' : 'Best Score Frontier (Min ↓)';
+      }
 
       if (!series || series.length === 0) {
         infoEl.innerText = 'No evaluated score trajectory available yet';
         return;
       }
 
-      infoEl.innerText = `Showing ${series.length} evaluated candidate steps (${currentProgressionMode === 'clock' ? 'Wall-Clock Completion Order' : 'Evolution Generation Order'})`;
+      infoEl.innerText = `Showing ${series.length} evaluated candidates (${currentProgressionMode === 'clock' ? 'Wall-Clock Completion Order' : 'Evolution Generation Order'})`;
 
-      const width = 800;
-      const height = 220;
-      const padL = 50;
-      const padR = 20;
-      const padT = 20;
+      // Match SVG coordinate system 1:1 with container pixel dimensions so circles and labels are never stretched
+      const width = Math.max((container ? container.clientWidth : 860) - 32, 420);
+      const height = Math.max((container ? container.clientHeight : 270) - 32, 200);
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+      const padL = 76;
+      const padR = 22;
+      const padT = 18;
       const padB = 30;
       const plotW = width - padL - padR;
       const plotH = height - padT - padB;
 
-      const rawScores = series.map(s => s.score);
-      const rawBests = series.map(s => s.best_so_far);
-      // Filter out non-physical simulation crash penalties (e.g. -1 trillion or extreme outliers) for Y-axis scale calculation
-      const validScores = rawScores.filter(v => v !== null && v !== undefined && v > -100000 && v < 1e9);
-      const validBests = rawBests.filter(v => v !== null && v !== undefined && v > -100000 && v < 1e9);
+      const rawScores = series
+        .map(s => s.score)
+        .filter(v => v !== null && v !== undefined && Number.isFinite(v));
+      const rawBests = series
+        .map(s => s.best_so_far)
+        .filter(v => v !== null && v !== undefined && Number.isFinite(v));
+
+      // Direction-aware, scale-aware relative outlier detection:
+      // Walks finite scores from best to worst and detects extreme bad-direction
+      // crash sentinels (e.g., -1e6/-1e9 on max, 1e9/1e12 on min) without
+      // misclassifying legitimate large metrics (e.g., FLOPs or DBU wirelength >= 1e8)
+      // or valid negative scores.
+      let penaltyThreshold = null;
+      if (rawScores.length >= 2) {
+        const bestToWorst = [...rawScores].sort((a, b) => (higherIsBetter ? (b - a) : (a - b)));
+        let runningMag = Math.abs(bestToWorst[0]);
+        let runningSpan = 0;
+        for (let i = 1; i < bestToWorst.length; i++) {
+          const prev = bestToWorst[i - 1];
+          const curr = bestToWorst[i];
+          const step = Math.abs(curr - prev);
+          const baselineScale = Math.max(runningMag, runningSpan, 1);
+          const isBadSign = higherIsBetter ? (curr < 0) : (curr > 0);
+          if (isBadSign && Math.abs(curr) >= 1e5 && step >= Math.max(1e5, 100 * baselineScale)) {
+            penaltyThreshold = curr;
+            break;
+          }
+          runningMag = Math.max(runningMag, Math.abs(curr));
+          runningSpan = Math.max(runningSpan, Math.abs(curr - bestToWorst[0]));
+        }
+      }
+
+      function isPenaltyVal(v) {
+        if (v === null || v === undefined || !Number.isFinite(v)) return true;
+        if (penaltyThreshold === null) return false;
+        return higherIsBetter ? (v <= penaltyThreshold) : (v >= penaltyThreshold);
+      }
+
+      const validScores = rawScores.filter(v => !isPenaltyVal(v));
+      const validBests = rawBests.filter(v => !isPenaltyVal(v));
       const scores = validScores.length > 0 ? validScores : rawScores;
       const bests = validBests.length > 0 ? validBests : rawBests;
       const minS = Math.min(...scores, ...bests);
       const maxS = Math.max(...scores, ...bests);
-      const rawRange = (maxS - minS) || 0.1;
-      let yMin = minS - rawRange * 0.08;
-      let yMax = maxS + rawRange * 0.08;
-      if (minS >= 0 && yMin < 0) {
-        yMin = 0;
-      }
-      const yRange = (yMax - yMin) || 0.1;
+      const rawRange = (maxS - minS) || (Math.abs(maxS) * 0.1) || 1.0;
+      const padY = rawRange * 0.12;
+      // Always keep vertical padding above and below minS/maxS so 0.0 scores and penalties never sit right on the axis line
+      const yMin = minS - padY;
+      const yMax = maxS + padY;
+      const yRange = (yMax - yMin) || 1e-12;
 
-      // Real continuous time scaling for Wall-Clock mode
       const epochTimes = series.map(s => s.timestamp ? new Date(s.timestamp).getTime() : 0);
       const minT = Math.min(...epochTimes);
       const maxT = Math.max(...epochTimes);
-      const spanT = (maxT - minT) || 1;
+      const actualSpanT = Math.max(0, maxT - minT);
 
       function xPos(pt, idx) {
-        if (currentProgressionMode === 'clock') {
-          if (spanT <= 0 || series.length <= 1) return padL + plotW / 2;
-          const t = pt.timestamp ? new Date(pt.timestamp).getTime() : minT;
-          return padL + ((t - minT) / spanT) * plotW;
-        }
         if (series.length <= 1) return padL + plotW / 2;
+        if (currentProgressionMode === 'clock' && actualSpanT > 0) {
+          const t = pt.timestamp ? new Date(pt.timestamp).getTime() : minT;
+          return padL + ((t - minT) / actualSpanT) * plotW;
+        }
         return padL + (idx / (series.length - 1)) * plotW;
       }
+
       function yPos(val) {
+        if (isPenaltyVal(val) && validScores.length > 0) {
+          // Place crash/penalty markers inside the plot area with breathing room from the axis line
+          return higherIsBetter ? (padT + plotH - 8) : (padT + 8);
+        }
         const clamped = Math.max(yMin, Math.min(yMax, val));
         return padT + plotH - ((clamped - yMin) / yRange) * plotH;
       }
 
-      // Grid lines & Y-axis labels
       let gridHtml = '';
       const gridSteps = 4;
       for (let i = 0; i <= gridSteps; i++) {
         const v = yMin + yRange * (i / gridSteps);
-        const y = yPos(v);
-        gridHtml += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#e0e0e0" stroke-dasharray="3,3" />`;
-        gridHtml += `<text x="${padL - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="#70757a">${v.toFixed(3)}</text>`;
+        const y = padT + plotH - (i / gridSteps) * plotH;
+        gridHtml += `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="#dfe3e8" stroke-dasharray="3,3" />`;
+        gridHtml += `<text x="${padL - 8}" y="${y + 4}" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="#5f6368">${escapeHtml(formatScore(v, true))}</text>`;
       }
 
-      // X-axis ticks (Bottom axis: Elapsed Time or Sequence Step)
-      const xTickCount = 5;
-      for (let i = 0; i <= xTickCount; i++) {
-        const ratio = i / xTickCount;
-        const x = padL + ratio * plotW;
-        let lbl = '';
-        if (currentProgressionMode === 'clock') {
-          const totalSec = Math.max(0, Math.round((spanT * ratio) / 1000));
-          if (totalSec === 0) {
-            lbl = '+0s';
-          } else {
-            const hrs = Math.floor(totalSec / 3600);
-            const mins = Math.floor((totalSec % 3600) / 60);
-            const secs = totalSec % 60;
-            if (hrs > 0) {
-              lbl = mins > 0 ? `+${hrs}h ${mins}m` : `+${hrs}h`;
-            } else if (mins > 0) {
-              lbl = secs > 0 ? `+${mins}m ${secs}s` : `+${mins}m`;
+      if (series.length === 1 || (currentProgressionMode === 'clock' && actualSpanT === 0)) {
+        const cx = padL + plotW / 2;
+        const lbl = currentProgressionMode === 'clock' ? '+0s' : '#1';
+        gridHtml += `<line x1="${cx}" y1="${padT + plotH}" x2="${cx}" y2="${padT + plotH + 4}" stroke="#80868b" />`;
+        gridHtml += `<text x="${cx}" y="${padT + plotH + 17}" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#5f6368">${lbl}</text>`;
+      } else {
+        const xTickCount = currentProgressionMode === 'clock'
+          ? Math.min(5, Math.max(1, Math.round(actualSpanT / 1000)))
+          : Math.min(5, series.length - 1);
+        let prevLbl = null;
+        for (let i = 0; i <= xTickCount; i++) {
+          const ratio = i / xTickCount;
+          const x = padL + ratio * plotW;
+          let lbl = '';
+          if (currentProgressionMode === 'clock') {
+            const totalSec = Math.max(0, Math.round((actualSpanT * ratio) / 1000));
+            if (totalSec === 0) {
+              lbl = '+0s';
             } else {
-              lbl = `+${secs}s`;
+              const hrs = Math.floor(totalSec / 3600);
+              const mins = Math.floor((totalSec % 3600) / 60);
+              const secs = totalSec % 60;
+              if (hrs > 0) {
+                lbl = mins > 0 ? `+${hrs}h ${mins}m` : `+${hrs}h`;
+              } else if (mins > 0) {
+                lbl = secs > 0 ? `+${mins}m ${secs}s` : `+${mins}m`;
+              } else {
+                lbl = `+${secs}s`;
+              }
             }
+          } else {
+            const stepIdx = Math.round(1 + ratio * (series.length - 1));
+            lbl = `#${stepIdx}`;
           }
-        } else {
-          const stepIdx = Math.round(1 + ratio * (series.length - 1));
-          lbl = `#${stepIdx}`;
+          if (lbl === prevLbl) continue;
+          prevLbl = lbl;
+          gridHtml += `<line x1="${x}" y1="${padT + plotH}" x2="${x}" y2="${padT + plotH + 4}" stroke="#80868b" />`;
+          gridHtml += `<text x="${x}" y="${padT + plotH + 17}" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#5f6368">${lbl}</text>`;
         }
-        gridHtml += `<line x1="${x}" y1="${padT + plotH}" x2="${x}" y2="${padT + plotH + 5}" stroke="#70757a" />`;
-        gridHtml += `<text x="${x}" y="${padT + plotH + 18}" text-anchor="middle" font-size="10" fill="#70757a">${lbl}</text>`;
       }
       svg.innerHTML += gridHtml;
 
-      // Peak-best staircase polyline
       const stepPoints = [];
       series.forEach((pt, i) => {
         const x = xPos(pt, i);
@@ -466,28 +1238,26 @@
           stepPoints.push(`${x},${y}`);
         }
       });
-      svg.innerHTML += `<polyline fill="none" stroke="#1e8e3e" stroke-width="2.8" points="${stepPoints.join(' ')}" />`;
+      svg.innerHTML += `<polyline fill="none" stroke="#188038" stroke-width="2.4" points="${stepPoints.join(' ')}" />`;
 
-      // Semi-transparent area fill under green curve
       if (series.length > 0) {
         const firstX = xPos(series[0], 0);
         const lastX = xPos(series[series.length - 1], series.length - 1);
-        const bottomY = padT + plotH;
-        const areaPoints = `${firstX},${bottomY} ${stepPoints.join(' ')} ${lastX},${bottomY}`;
-        svg.innerHTML += `<polygon fill="rgba(52, 168, 83, 0.10)" points="${areaPoints}" />`;
+        const baseLineY = higherIsBetter ? (padT + plotH) : padT;
+        const areaPoints = `${firstX},${baseLineY} ${stepPoints.join(' ')} ${lastX},${baseLineY}`;
+        svg.innerHTML += `<polygon fill="rgba(24, 128, 56, 0.08)" points="${areaPoints}" />`;
       }
 
-      // Candidate points (circles)
       series.forEach((pt, i) => {
         const cx = xPos(pt, i);
         const cy = yPos(pt.score);
         const isPeak = pt.is_new_best;
-        const isPenalty = pt.score < -100000;
+        const isPenalty = isPenaltyVal(pt.score);
         const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
         circle.setAttribute("cx", cx);
         circle.setAttribute("cy", cy);
-        circle.setAttribute("r", isPeak ? "5.5" : "3.5");
-        circle.setAttribute("fill", isPeak ? "#f9ab00" : (isPenalty ? "#ea4335" : "#1a73e8"));
+        circle.setAttribute("r", isPeak ? "5" : "3.5");
+        circle.setAttribute("fill", isPeak ? "#f9ab00" : (isPenalty ? "#d93025" : "#0b57d0"));
         circle.setAttribute("stroke", "#ffffff");
         circle.setAttribute("stroke-width", "1.5");
         circle.style.cursor = "pointer";
@@ -498,8 +1268,9 @@
           tooltip.style.left = (evt.clientX - rect.left + 12) + 'px';
           tooltip.style.top = (evt.clientY - rect.top - 10) + 'px';
           const timeStr = pt.timestamp ? (pt.timestamp.split('T')[1] || '').split('.')[0] : '';
-          const scoreDisp = isPenalty ? pt.score.toExponential(2) : pt.score.toFixed(5);
-          tooltip.innerHTML = `<strong>Step #${pt.seq} &bull; Prog ${pt.id}</strong>${isPeak ? ' 🏆 NEW RECORD' : (isPenalty ? ' ⚠️ CRASH PENALTY' : '')}<br>Candidate Score: <code>${scoreDisp}</code> &nbsp;|&nbsp; Peak Best: <code>${pt.best_so_far.toFixed(5)}</code><br><span style="color:#bdc1c6;">Time: ${timeStr}</span>`;
+          const scoreDisp = formatScore(pt.score, false);
+          const bestDisp = formatScore(pt.best_so_far, false);
+          tooltip.innerHTML = `<strong>Step #${escapeHtml(pt.seq)} &middot; Program ${escapeHtml(pt.id)}</strong>${isPeak ? ' <span style="color:#fbbc04;">(New Record)</span>' : (isPenalty ? ' <span style="color:#f28b82;">(Penalty)</span>' : '')}<br>Score: <code>${escapeHtml(scoreDisp)}</code> &nbsp;|&nbsp; Best Frontier: <code>${escapeHtml(bestDisp)}</code><br><span style="color:#bdc1c6;">Completed: ${escapeHtml(timeStr)}</span>`;
         };
         circle.onmouseout = function() {
           tooltip.style.display = 'none';
@@ -511,14 +1282,30 @@
       });
     }
 
+    function scheduleNextPoll() {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+      const check = document.getElementById('auto-refresh-check');
+      if (check && check.checked && !isTerminalState(currentExpState)) {
+        refreshTimer = setTimeout(() => fetchStatus(false), 5000);
+      }
+    }
+
     function toggleAutoRefresh() {
       const check = document.getElementById('auto-refresh-check');
       if (refreshTimer) {
-        clearInterval(refreshTimer);
+        clearTimeout(refreshTimer);
         refreshTimer = null;
       }
-      if (check.checked) {
-        refreshTimer = setInterval(fetchStatus, 5000);
+      if (check && check.checked) {
+        if (isTerminalState(currentExpState)) {
+          // If the user manually re-enables on a completed experiment, do one refresh and uncheck
+          fetchStatus(true);
+        } else {
+          scheduleNextPoll();
+        }
       }
     }
 
