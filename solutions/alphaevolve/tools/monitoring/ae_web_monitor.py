@@ -43,7 +43,12 @@ from alpha_evolve.monitoring import AlphaEvolveMonitor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("AlphaEvolveCloudRun")
 
-TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+_SCRIPT_DIR = Path(os.path.abspath(__file__)).parent
+TEMPLATES_DIR = (
+    _SCRIPT_DIR / "templates"
+    if (_SCRIPT_DIR / "templates").is_dir()
+    else Path(__file__).resolve().parent / "templates"
+)
 _MONITOR_LOCK = threading.Lock()
 _CACHED_MONITOR: Optional[AlphaEvolveMonitor] = None
 
@@ -103,9 +108,10 @@ class AlphaEvolveHTTPRequestHandler(BaseHTTPRequestHandler):
         # REST APIs
         try:
             monitor = _get_monitor()
+            force_refresh = params.get("refresh", ["0"])[0].lower() in ("1", "true", "yes")
 
             if path == "/api/experiments":
-                exps = monitor.list_all_experiments()
+                exps = monitor.list_all_experiments(force_refresh=force_refresh)
                 self.send_json_response(200, {"experiments": exps})
                 return
 
@@ -115,8 +121,12 @@ class AlphaEvolveHTTPRequestHandler(BaseHTTPRequestHandler):
                     self.send_json_response(400, {"error": "Missing query parameter 'exp'"})
                     return
                 limit_str = params.get("limit", [None])[0]
-                max_progs = int(limit_str) if limit_str and limit_str.isdigit() else 100
-                status = monitor.get_experiment_status(experiment_name=exp_name, max_programs=max_progs)
+                max_progs = int(limit_str) if limit_str and limit_str.isdigit() else None
+                status = monitor.get_experiment_status(
+                    experiment_name=exp_name,
+                    max_programs=max_progs,
+                    force_refresh=force_refresh,
+                )
                 self.send_json_response(200, status)
                 return
 
@@ -125,8 +135,37 @@ class AlphaEvolveHTTPRequestHandler(BaseHTTPRequestHandler):
                 if not exp_name:
                     self.send_json_response(400, {"error": "Missing query parameter 'exp'"})
                     return
-                programs = monitor.list_programs(experiment_name=exp_name, page_size=100)
-                lineage = monitor.analyze_lineage(programs)
+                target_metric = params.get("metric", [None])[0]
+                exp_config = {}
+                initial_prog = None
+                try:
+                    raw_exp = monitor.get_cached_experiment(
+                        exp_name, force_refresh=force_refresh
+                    )
+                    if raw_exp:
+                        exp_config = raw_exp.get("config", {})
+                        initial_prog = monitor.get_initial_program(
+                            raw_exp, force_refresh=force_refresh
+                        )
+                except ValueError:
+                    raise
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    logger.debug(
+                        "Could not fetch experiment config for lineage: %s", exc
+                    )
+                programs = monitor.list_programs(
+                    experiment_name=exp_name,
+                    page_size=100,
+                    max_programs=None,
+                    force_refresh=force_refresh,
+                    unflatten_files=False,
+                )
+                lineage = monitor.analyze_lineage(
+                    programs,
+                    target_metric=target_metric,
+                    config=exp_config,
+                    initial_prog=initial_prog,
+                )
                 self.send_json_response(200, lineage)
                 return
 
@@ -159,6 +198,7 @@ class AlphaEvolveHTTPRequestHandler(BaseHTTPRequestHandler):
                 exp_name = params.get("exp", [None])[0]
                 prog_id = params.get("prog", [None])[0]
                 base_id = params.get("base", [None])[0]
+                target_metric = params.get("metric", [None])[0]
                 if not exp_name or not prog_id or not base_id:
                     self.send_json_response(400, {"error": "Missing query parameter 'exp', 'prog', or 'base'"})
                     return
@@ -166,12 +206,19 @@ class AlphaEvolveHTTPRequestHandler(BaseHTTPRequestHandler):
                     program_id=prog_id,
                     base_program_id=base_id,
                     experiment_name=exp_name,
+                    target_metric=target_metric,
                 )
                 self.send_json_response(200, explanation_info)
                 return
 
             self.send_json_response(404, {"error": f"Path not found: {path}"})
 
+        except json.JSONDecodeError as e:
+            logger.error("JSON decode error handling GET request: %s", e, exc_info=True)
+            self.send_json_response(500, {"error": str(e)})
+        except ValueError as e:
+            logger.warning("Invalid query parameter on %s: %s", path, e)
+            self.send_json_response(400, {"error": str(e)})
         except Exception as e:
             logger.error("Error handling GET request: %s", e, exc_info=True)
             self.send_json_response(500, {"error": str(e)})

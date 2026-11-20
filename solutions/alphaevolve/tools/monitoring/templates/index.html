@@ -1,96 +1,911 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>AlphaEvolve Cloud Run Web Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AlphaEvolve Experiment Monitor — Discover, track, and inspect evolutionary code discovery experiments on Google Cloud.">
+  <title>AlphaEvolve Experiment Monitor | Google Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=swap" rel="stylesheet">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; background: #f8f9fa; color: #212529; }
-    .container { max-width: 960px; margin: 0 auto; background: white; padding: 36px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
-    h1 { color: #1a73e8; margin-top: 0; }
-    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 22px; margin-top: 22px; }
-    .btn { display: inline-block; background: #1a73e8; color: white; padding: 8px 14px; text-decoration: none; border-radius: 6px; font-weight: 500; margin-right: 8px; margin-top: 8px; font-size: 0.95em; }
-    .btn:hover { background: #1557b0; }
-    .btn-green { background: #188038; }
-    .btn-green:hover { background: #137333; }
-    code { background: #f1f3f4; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
-    .exp-item { border: 1px solid #d2e3fc; background: #f8fbff; border-radius: 8px; padding: 18px; margin-top: 14px; }
-    .exp-title { font-size: 1.25em; font-weight: 600; color: #1a73e8; margin: 0 0 6px 0; }
-    .exp-meta { font-size: 0.88em; color: #5f6368; margin: 4px 0 10px 0; word-break: break-all; }
-    .badge { background: #e6f4ea; color: #137333; padding: 3px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600; display: inline-block; margin-right: 6px; }
+    :root {
+      --gm-primary: #0b57d0;
+      --gm-primary-hover: #0842a0;
+      --gm-primary-container: #d3e3fd;
+      --gm-primary-subtle: #eff6ff;
+      --gm-on-surface: #1f1f1f;
+      --gm-on-surface-variant: #444746;
+      --gm-muted: #5f6368;
+      --gm-surface: #ffffff;
+      --gm-canvas: #f8fafd;
+      --gm-surface-dim: #f1f5f9;
+      --gm-outline: #dadce0;
+      --gm-outline-subtle: #e8eaed;
+      --gm-success-text: #146c2e;
+      --gm-success-bg: #e6f4ea;
+      --gm-warning-text: #b06000;
+      --gm-warning-bg: #fef7e0;
+      --gm-error-text: #b3261e;
+      --gm-error-bg: #fce8e6;
+      --gm-radius-sm: 6px;
+      --gm-radius-md: 8px;
+      --gm-radius-lg: 12px;
+      --gm-shadow-sm: 0 1px 2px 0 rgba(60, 64, 67, 0.08), 0 1px 3px 1px rgba(60, 64, 67, 0.04);
+      --gm-shadow-md: 0 2px 6px 2px rgba(60, 64, 67, 0.08), 0 1px 2px 0 rgba(60, 64, 67, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      background-color: var(--gm-canvas);
+      color: var(--gm-on-surface);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+
+    .material-symbols-outlined {
+      font-size: 18px;
+      line-height: 1;
+      vertical-align: middle;
+      user-select: none;
+    }
+
+    /* Top App Bar (Google Cloud Console Standard) */
+    .app-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: 56px;
+      background: var(--gm-surface);
+      border-bottom: 1px solid var(--gm-outline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+
+    .app-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--gm-on-surface);
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--gm-primary-subtle);
+      border: 1px solid var(--gm-primary-container);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gm-primary);
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--gm-on-surface);
+    }
+
+    .brand-divider {
+      height: 18px;
+      width: 1px;
+      background: var(--gm-outline);
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gm-muted);
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 100%;
+    }
+
+    .nav-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 100%;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gm-on-surface-variant);
+      text-decoration: none;
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--gm-primary);
+      background-color: var(--gm-canvas);
+    }
+
+    .nav-tab.active {
+      color: var(--gm-primary);
+      font-weight: 600;
+      border-bottom-color: var(--gm-primary);
+    }
+
+    .app-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .health-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--gm-success-bg);
+      color: var(--gm-success-text);
+      text-decoration: none;
+    }
+
+    .health-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--gm-success-text);
+    }
+
+    /* Main Workspace Layout */
+    .workspace {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 28px 24px 64px;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+
+    .page-header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      margin: 0 0 4px 0;
+      color: var(--gm-on-surface);
+    }
+
+    .page-header p {
+      margin: 0;
+      font-size: 13.5px;
+      color: var(--gm-muted);
+    }
+
+    /* Summary KPI Strip */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: var(--gm-surface);
+      border: 1px solid var(--gm-outline);
+      border-radius: var(--gm-radius-md);
+      padding: 16px 20px;
+      box-shadow: var(--gm-shadow-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--gm-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .kpi-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--gm-on-surface);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .kpi-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--gm-surface-dim);
+      color: var(--gm-on-surface-variant);
+    }
+
+    /* Surface Card */
+    .card {
+      background: var(--gm-surface);
+      border: 1px solid var(--gm-outline);
+      border-radius: var(--gm-radius-md);
+      box-shadow: var(--gm-shadow-sm);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--gm-outline-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--gm-on-surface);
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-box .material-symbols-outlined {
+      position: absolute;
+      left: 10px;
+      color: var(--gm-muted);
+      font-size: 18px;
+      pointer-events: none;
+    }
+
+    .search-input {
+      padding: 7px 12px 7px 34px;
+      border: 1px solid var(--gm-outline);
+      border-radius: var(--gm-radius-sm);
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--gm-on-surface);
+      width: 260px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--gm-primary);
+      box-shadow: 0 0 0 2px var(--gm-primary-container);
+    }
+
+    .select-input {
+      padding: 7px 12px;
+      border: 1px solid var(--gm-outline);
+      border-radius: var(--gm-radius-sm);
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--gm-on-surface);
+      background: var(--gm-surface);
+      cursor: pointer;
+      outline: none;
+    }
+
+    .select-input:focus {
+      border-color: var(--gm-primary);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--gm-radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--gm-primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: var(--gm-primary-hover);
+      box-shadow: 0 1px 2px rgba(11, 87, 208, 0.3);
+    }
+
+    .btn-tonal {
+      background: var(--gm-primary-subtle);
+      color: var(--gm-primary);
+      border-color: var(--gm-primary-container);
+    }
+
+    .btn-tonal:hover {
+      background: var(--gm-primary-container);
+    }
+
+    .btn-outlined {
+      background: var(--gm-surface);
+      color: var(--gm-on-surface-variant);
+      border-color: var(--gm-outline);
+    }
+
+    .btn-outlined:hover {
+      background: var(--gm-canvas);
+      color: var(--gm-on-surface);
+    }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border-radius: 4px;
+      border: none;
+      background: transparent;
+      color: var(--gm-muted);
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      background: var(--gm-surface-dim);
+      color: var(--gm-primary);
+    }
+
+    /* Experiment Rows */
+    #loading {
+      padding: 36px 24px;
+      text-align: center;
+      color: var(--gm-muted);
+      font-size: 13.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--gm-outline);
+      border-top-color: var(--gm-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .exp-list-container {
+      divide-y: 1px solid var(--gm-outline-subtle);
+    }
+
+    .exp-item {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--gm-outline-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      transition: background-color 0.12s ease;
+    }
+
+    .exp-item:last-child {
+      border-bottom: none;
+    }
+
+    .exp-item:hover {
+      background-color: #fafcfe;
+    }
+
+    .exp-main {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .exp-header-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .exp-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gm-primary);
+      text-decoration: none;
+      margin: 0;
+    }
+
+    .exp-title:hover {
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .badge-running {
+      background: var(--gm-success-bg);
+      color: var(--gm-success-text);
+    }
+
+    .badge-completed {
+      background: var(--gm-primary-subtle);
+      color: var(--gm-primary);
+    }
+
+    .badge-other {
+      background: var(--gm-warning-bg);
+      color: var(--gm-warning-text);
+    }
+
+    .badge-neutral {
+      background: var(--gm-surface-dim);
+      color: var(--gm-on-surface-variant);
+      font-family: 'Roboto Mono', monospace;
+      font-weight: 500;
+    }
+
+    .exp-meta {
+      font-size: 12px;
+      color: var(--gm-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    code {
+      font-family: 'Roboto Mono', monospace;
+      background: var(--gm-surface-dim);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      color: var(--gm-on-surface-variant);
+    }
+
+    .exp-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* API Reference Table */
+    .api-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .api-table th,
+    .api-table td {
+      padding: 11px 20px;
+      text-align: left;
+      border-bottom: 1px solid var(--gm-outline-subtle);
+    }
+
+    .api-table th {
+      background: var(--gm-canvas);
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--gm-muted);
+    }
+
+    .api-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .method-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--gm-primary-subtle);
+      color: var(--gm-primary);
+    }
+
+    /* Snackbar Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #323232;
+      color: #ffffff;
+      padding: 10px 16px;
+      border-radius: var(--gm-radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--gm-shadow-md);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      z-index: 2000;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>🚀 AlphaEvolve Cloud Run Web Service</h1>
-    <p>Welcome to the serverless AlphaEvolve monitoring dashboard and interactive evolutionary lineage visualizer.</p>
-    
-    <div class="card">
-      <h3>System &amp; Discovery API</h3>
-      <a class="btn" href="/health">Service Health (/health)</a>
-      <a class="btn" href="/api/experiments">Raw JSON Experiments List (/api/experiments)</a>
+  <!-- Google Cloud Standard Top App Bar -->
+  <header class="app-bar">
+    <div style="display: flex; align-items: center; gap: 24px; height: 100%;">
+      <div class="app-brand">
+        <div class="brand-icon">
+          <span class="material-symbols-outlined">hub</span>
+        </div>
+        <span class="brand-title">AlphaEvolve</span>
+      </div>
+      <nav class="nav-tabs" aria-label="Main Navigation">
+        <a href="/" class="nav-tab active">
+          <span class="material-symbols-outlined">folder_managed</span>
+          Experiments
+        </a>
+        <a href="/status" class="nav-tab" id="nav-status-link">
+          <span class="material-symbols-outlined">monitoring</span>
+          Live Telemetry
+        </a>
+        <a href="/lineage" class="nav-tab" id="nav-lineage-link">
+          <span class="material-symbols-outlined">account_tree</span>
+          Lineage Explorer
+        </a>
+      </nav>
+    </div>
+    <div class="app-actions">
+      <a href="/health" target="_blank" class="health-pill" title="Check Cloud Run service health">
+        <span class="health-dot"></span>
+        <span>Service Operational</span>
+      </a>
+      <a href="/api/experiments" target="_blank" class="btn btn-outlined" style="padding: 5px 10px; font-size: 12px;">
+        <span class="material-symbols-outlined" style="font-size: 16px;">data_object</span>
+        API JSON
+      </a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <div class="page-header">
+      <div>
+        <h1>Discovery Experiments Directory</h1>
+        <p>Monitor live evolutionary candidate generation, evaluation telemetry, and program lineage across sessions.</p>
+      </div>
+      <div>
+        <button class="btn btn-outlined" onclick="loadExperiments(true)" id="btn-refresh-experiments">
+          <span class="material-symbols-outlined">refresh</span>
+          Refresh Directory
+        </button>
+      </div>
     </div>
 
-    <div class="card">
-      <h3>🧪 Active Discovery Experiments Directory</h3>
-      <p>Discovered real-time candidate evolution experiments across accessible sessions:</p>
-      <div id="loading"><strong>🔍 Discovering active AlphaEvolve experiments from Discovery Engine API...</strong></div>
-      <div id="experiments-list"></div>
+    <!-- Summary KPI Strip -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Total Experiments</div>
+          <div class="kpi-value" id="kpi-total">-</div>
+        </div>
+        <div class="kpi-icon">
+          <span class="material-symbols-outlined">science</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Active / Running</div>
+          <div class="kpi-value" id="kpi-running" style="color: var(--gm-success-text);">-</div>
+        </div>
+        <div class="kpi-icon" style="background: var(--gm-success-bg); color: var(--gm-success-text);">
+          <span class="material-symbols-outlined">bolt</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-label">Completed</div>
+          <div class="kpi-value" id="kpi-completed" style="color: var(--gm-primary);">-</div>
+        </div>
+        <div class="kpi-icon" style="background: var(--gm-primary-subtle); color: var(--gm-primary);">
+          <span class="material-symbols-outlined">task_alt</span>
+        </div>
+      </div>
     </div>
 
-    <div class="card">
-      <h3>REST API Documentation</h3>
-      <ul>
-        <li><code>GET /health</code> - Returns service operational status</li>
-        <li><code>GET /api/experiments</code> - Lists AlphaEvolve experiments in GCP project across all sessions</li>
-        <li><code>GET /api/status?exp=&lt;EXPERIMENT_ID&gt;</code> - Returns live progression statistics &amp; candidate evaluation counts</li>
-        <li><code>GET /lineage?exp=&lt;EXPERIMENT_ID&gt;</code> - Interactive Evolutionary Forest Graph Visualizer (Child/Parent/Sibling relationships &amp; Code Inspector)</li>
-        <li><code>GET /api/lineage?exp=&lt;EXPERIMENT_ID&gt;</code> - JSON ancestry tree &amp; per-node metadata</li>
-        <li><code>GET /api/program_code?exp=&lt;EXPERIMENT_ID&gt;&amp;prog=&lt;PROGRAM_ID&gt;</code> - Returns program details and source code files</li>
-      </ul>
-    </div>
+    <!-- Experiments Directory Card -->
+    <section class="card" aria-label="Active Discovery Experiments">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="material-symbols-outlined" style="color: var(--gm-primary);">list_alt</span>
+          <h2 class="card-title">Discovered Experiments</h2>
+        </div>
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="material-symbols-outlined">search</span>
+            <input type="text" id="exp-search-input" class="search-input" placeholder="Filter by title or experiment ID..." oninput="renderExperimentList()">
+          </div>
+          <select id="exp-state-filter" class="select-input" onchange="renderExperimentList()">
+            <option value="ALL">All States</option>
+            <option value="RUNNING">Running</option>
+            <option value="PAUSED">Paused</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="FAILED">Failed</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="loading">
+        <div class="spinner"></div>
+        <span>Discovering AlphaEvolve experiments from Discovery Engine API...</span>
+      </div>
+      <div id="experiments-list" class="exp-list-container"></div>
+    </section>
+
+    <!-- REST API Reference Card -->
+    <section class="card" aria-label="REST API Documentation">
+      <div class="card-header">
+        <div class="card-title-group">
+          <span class="material-symbols-outlined" style="color: var(--gm-muted);">terminal</span>
+          <h2 class="card-title">Programmatic REST API Endpoints</h2>
+        </div>
+      </div>
+      <table class="api-table">
+        <thead>
+          <tr>
+            <th style="width: 90px;">Method</th>
+            <th style="width: 380px;">Endpoint</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="method-badge">GET</span></td>
+            <td><code>/health</code></td>
+            <td>Returns Cloud Run service operational health status.</td>
+          </tr>
+          <tr>
+            <td><span class="method-badge">GET</span></td>
+            <td><code>/api/experiments</code></td>
+            <td>Lists all AlphaEvolve experiments discovered in the configured GCP project across sessions.</td>
+          </tr>
+          <tr>
+            <td><span class="method-badge">GET</span></td>
+            <td><code>/api/status?exp=&lt;EXPERIMENT_ID&gt;</code></td>
+            <td>Returns live generation progress, token consumption, and candidate evaluation trajectory.</td>
+          </tr>
+          <tr>
+            <td><span class="method-badge">GET</span></td>
+            <td><code>/api/lineage?exp=&lt;EXPERIMENT_ID&gt;</code></td>
+            <td>Returns the full evolutionary ancestry forest graph and per-candidate score metadata.</td>
+          </tr>
+          <tr>
+            <td><span class="method-badge">GET</span></td>
+            <td><code>/api/program_code?exp=&lt;EXPERIMENT_ID&gt;&amp;prog=&lt;PROGRAM_ID&gt;</code></td>
+            <td>Retrieves unflattened candidate program source files and evaluation insights.</td>
+          </tr>
+          <tr>
+            <td><span class="method-badge">GET</span></td>
+            <td><code>/api/program_diff?exp=&lt;EXPERIMENT_ID&gt;&amp;prog=&lt;ID&gt;&amp;base=&lt;BASE_ID&gt;</code></td>
+            <td>Computes side-by-side and unified line diffs between two candidate programs.</td>
+          </tr>
+          <tr>
+            <td><span class="method-badge">GET</span></td>
+            <td><code>/api/explain_evolution?exp=&lt;EXPERIMENT_ID&gt;&amp;prog=&lt;ID&gt;&amp;base=&lt;BASE_ID&gt;</code></td>
+            <td>Generates and caches a Vertex AI Gemini explanation of code mutations and score deltas.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite">
+    <span class="material-symbols-outlined" style="font-size: 16px; color: #81c995;">check_circle</span>
+    <span id="toast-text">Copied to clipboard</span>
   </div>
 
   <script>
-    async function loadExperiments() {
-      try {
-        const res = await fetch('/api/experiments');
-        const data = await res.json();
-        const container = document.getElementById('experiments-list');
-        document.getElementById('loading').style.display = 'none';
+    let allExperiments = [];
 
-        const exps = data.experiments || [];
-        if (exps.length === 0) {
-          container.innerHTML = '<p><em>No active experiments found in the current project or engine.</em></p>';
-          return;
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-text').innerText = msg;
+      toast.style.display = 'inline-flex';
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        toast.style.display = 'none';
+      }, 2400);
+    }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Experiment resource ID copied to clipboard');
+      });
+    }
+
+    async function loadExperiments(forceRefresh = false) {
+      const loadingEl = document.getElementById('loading');
+      const container = document.getElementById('experiments-list');
+      loadingEl.style.display = 'flex';
+      container.innerHTML = '';
+
+      try {
+        const url = forceRefresh ? '/api/experiments?refresh=1' : '/api/experiments';
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        loadingEl.style.display = 'none';
+
+        allExperiments = data.experiments || [];
+
+        // Update KPI strip
+        const runningCount = allExperiments.filter(e => (e.state || '').toUpperCase() === 'RUNNING').length;
+        const completedCount = allExperiments.filter(e => (e.state || '').toUpperCase() === 'COMPLETED').length;
+        document.getElementById('kpi-total').innerText = allExperiments.length;
+        document.getElementById('kpi-running').innerText = runningCount;
+        document.getElementById('kpi-completed').innerText = completedCount;
+
+        if (allExperiments.length > 0) {
+          const firstExp = encodeURIComponent(allExperiments[0].name);
+          document.getElementById('nav-status-link').href = `/status?exp=${firstExp}`;
+          document.getElementById('nav-lineage-link').href = `/lineage?exp=${firstExp}`;
         }
 
-        exps.forEach(exp => {
-          const title = (exp.config && exp.config.title) ? exp.config.title : exp.name.split('/').pop();
-          const lang = (exp.config && exp.config.programLanguage) ? exp.config.programLanguage : 'unknown';
-          const state = exp.state || 'UNSPECIFIED';
-          const expId = exp.name;
-
-          const div = document.createElement('div');
-          div.className = 'exp-item';
-          div.innerHTML = `
-            <div class="exp-title">${title}</div>
-            <div>
-              <span class="badge">State: ${state}</span>
-              <span class="badge" style="background:#f1f3f4;color:#3c4043;">Lang: ${lang}</span>
-            </div>
-            <div class="exp-meta">ID: <code>${expId}</code></div>
-            <div>
-              <a class="btn" href="/status?exp=${encodeURIComponent(expId)}">📊 Live Progress Status</a>
-              <a class="btn btn-green" href="/lineage?exp=${encodeURIComponent(expId)}">🌳 View Lineage Forest</a>
-              <a href="/api/status?exp=${encodeURIComponent(expId)}" target="_blank" style="font-size:0.8em;color:#5f6368;margin-left:6px;">[JSON]</a>
-            </div>
-          `;
-          container.appendChild(div);
-        });
+        renderExperimentList();
+        if (forceRefresh) {
+          showToast('Experiments directory refreshed');
+        }
       } catch (err) {
-        document.getElementById('loading').innerHTML = '<span style="color: red;">Error discovering experiments: ' + err.message + '</span>';
+        loadingEl.innerHTML = `<span class="material-symbols-outlined" style="color: var(--gm-error-text);">error</span><span style="color: var(--gm-error-text);">Error discovering experiments: ${escapeHtml(err.message)}</span>`;
       }
     }
+
+    function renderExperimentList() {
+      const container = document.getElementById('experiments-list');
+      container.innerHTML = '';
+
+      const searchQuery = (document.getElementById('exp-search-input').value || '').toLowerCase().trim();
+      const stateFilter = document.getElementById('exp-state-filter').value;
+
+      const filtered = allExperiments.filter(exp => {
+        const title = (exp.config && exp.config.title) ? exp.config.title : exp.name.split('/').pop();
+        const state = (exp.state || 'UNSPECIFIED').toUpperCase();
+        const matchesSearch = !searchQuery || title.toLowerCase().includes(searchQuery) || exp.name.toLowerCase().includes(searchQuery);
+        const matchesState = stateFilter === 'ALL' || state === stateFilter;
+        return matchesSearch && matchesState;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div style="padding: 40px 24px; text-align: center; color: var(--gm-muted); font-size: 13.5px;">
+            No experiments match the current filter criteria.
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(exp => {
+        const title = (exp.config && exp.config.title) ? exp.config.title : exp.name.split('/').pop();
+        const lang = (exp.config && exp.config.programLanguage) ? exp.config.programLanguage : 'python';
+        const state = (exp.state || 'UNSPECIFIED').toUpperCase();
+        const expId = exp.name;
+        const encodedId = encodeURIComponent(expId);
+
+        let badgeClass = 'badge-other';
+        let badgeIcon = 'schedule';
+        if (state === 'RUNNING') {
+          badgeClass = 'badge-running';
+          badgeIcon = 'play_circle';
+        } else if (state === 'COMPLETED') {
+          badgeClass = 'badge-completed';
+          badgeIcon = 'check_circle';
+        } else if (state === 'PAUSED') {
+          badgeIcon = 'pause_circle';
+        }
+
+        const div = document.createElement('div');
+        div.className = 'exp-item';
+        div.innerHTML = `
+          <div class="exp-main">
+            <div class="exp-header-row">
+              <a class="exp-title" href="/status?exp=${encodedId}">${escapeHtml(title)}</a>
+              <span class="badge ${badgeClass}">
+                <span class="material-symbols-outlined" style="font-size: 14px;">${badgeIcon.toLowerCase()}</span>
+                ${escapeHtml(state)}
+              </span>
+              <span class="badge badge-neutral">${escapeHtml(lang)}</span>
+            </div>
+            <div class="exp-meta">
+              <span>Resource ID:</span>
+              <code>${escapeHtml(expId)}</code>
+              <button class="icon-btn copy-exp-btn" type="button" title="Copy Resource ID">
+                <span class="material-symbols-outlined" style="font-size: 15px;">content_copy</span>
+              </button>
+            </div>
+          </div>
+          <div class="exp-actions">
+            <a class="btn btn-primary" href="/status?exp=${encodedId}">
+              <span class="material-symbols-outlined">monitoring</span>
+              Live Telemetry
+            </a>
+            <a class="btn btn-tonal" href="/lineage?exp=${encodedId}">
+              <span class="material-symbols-outlined">account_tree</span>
+              Lineage Explorer
+            </a>
+            <a class="btn btn-outlined" href="/api/status?exp=${encodedId}" target="_blank" title="View Raw Status JSON">
+              <span class="material-symbols-outlined">code</span>
+              JSON
+            </a>
+          </div>
+        `;
+        const copyBtn = div.querySelector('.copy-exp-btn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', () => copyText(expId));
+        }
+        container.appendChild(div);
+      });
+    }
+
     loadExperiments();
   </script>
 </body>
